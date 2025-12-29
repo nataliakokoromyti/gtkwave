@@ -22,6 +22,9 @@
 #if !defined(MAC_INTEGRATION) && defined(GDK_WINDOWING_WAYLAND)
 #include <gdk/gdkwayland.h>
 #endif
+#if !defined(MAC_INTEGRATION) && defined(GDK_WINDOWING_BROADWAY)
+#include <gdk/gdkbroadway.h>
+#endif
 #endif
 #endif
 
@@ -39,6 +42,7 @@ static int use_embedded = 1;
 static int use_embedded = 0;
 #endif
 static int twinwayland = 0;
+static int twinbroadway = 0;
 
 static int plug_removed(GtkWidget *widget, gpointer data)
 {
@@ -145,6 +149,12 @@ int main(int argc, char **argv)
         use_embedded = 0;
     }
 #endif
+#ifdef GDK_WINDOWING_BROADWAY
+    if (GDK_IS_BROADWAY_DISPLAY(gdk_display_get_default())) {
+        twinbroadway = 1;
+        use_embedded = 0;
+    }
+#endif
 #if defined(__GTK_SOCKET_H__) && defined(GDK_WINDOWING_X11)
     {
         xsocket[0] = gtk_socket_new();
@@ -155,7 +165,7 @@ int main(int argc, char **argv)
 #endif
 
 #if defined(__GTK_SOCKET_H__) && defined(GDK_WINDOWING_X11)
-    if (!twinwayland)
+    if (!twinwayland && !twinbroadway)
         g_signal_connect(xsocket[0], "plug-removed", G_CALLBACK(plug_removed), NULL);
 #endif
 
@@ -178,7 +188,7 @@ int main(int argc, char **argv)
     gtk_box_pack_start(GTK_BOX(main_vbox), vpan, TRUE, TRUE, 1);
 
 #if defined(__GTK_SOCKET_H__) && defined(GDK_WINDOWING_X11)
-    if (!twinwayland) {
+    if (!twinwayland && !twinbroadway) {
         gtk_paned_pack1(GTK_PANED(vpan), xsocket[0], TRUE, FALSE);
         g_signal_connect(xsocket[1], "plug-removed", G_CALLBACK(plug_removed), NULL);
         gtk_paned_pack2(GTK_PANED(vpan), xsocket[1], TRUE, FALSE);
