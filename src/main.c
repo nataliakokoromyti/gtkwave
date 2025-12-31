@@ -1287,6 +1287,8 @@ do_primary_inits:
         }
         if (!wcp_gtkwave_initiate(host, (guint16)port_val)) {
             fprintf(stderr, "GTKWAVE | WCP initiate failed\n");
+            free_2(address_copy);
+            exit(255);
         }
         free_2(address_copy);
     } else if (wcp_port >= 0) {
@@ -1295,6 +1297,7 @@ do_primary_inits:
         }
         if (!wcp_gtkwave_init((guint16)wcp_port)) {
             fprintf(stderr, "GTKWAVE | WCP server failed to start\n");
+            exit(255);
         }
     }
 #endif
