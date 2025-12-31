@@ -10,16 +10,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include "analyzer.h"
-#include "color.h"
 #include "currenttime.h"
 #include "globals.h"
 #include "lx2.h"
 #include "menu.h"
 #include "signal_list.h"
 #include "symbol.h"
-#include "timeentry.h"
 #include "wavewindow.h"
-#include "zoombuttons.h"
 
 /* Global WCP server instance */
 WcpServer *g_wcp_server = NULL;
@@ -172,55 +169,6 @@ static void wcp_item_info_free(gpointer data)
     g_free(info->name);
     g_free(info->type);
     g_free(info);
-}
-
-static gint wcp_find_marker_index(GwNamedMarkers *markers, GwMarker *marker)
-{
-    guint count = gw_named_markers_get_number_of_markers(markers);
-    for (guint i = 0; i < count; i++) {
-        if (gw_named_markers_get(markers, i) == marker) {
-            return (gint)i;
-        }
-    }
-    return -1;
-}
-
-static gint wcp_parse_color(const gchar *color)
-{
-    if (!color || !*color) {
-        return -1;
-    }
-
-    if (g_ascii_isdigit(color[0])) {
-        char *end = NULL;
-        long val = strtol(color, &end, 10);
-        if (end && *end == '\0' && val >= 0 && val <= WAVE_NUM_RAINBOW) {
-            return (gint)val;
-        }
-    }
-
-    static const struct {
-        const gchar *name;
-        gint value;
-    } color_map[] = {
-        {"normal", WAVE_COLOR_NORMAL},
-        {"default", WAVE_COLOR_NORMAL},
-        {"red", WAVE_COLOR_RED},
-        {"orange", WAVE_COLOR_ORANGE},
-        {"yellow", WAVE_COLOR_YELLOW},
-        {"green", WAVE_COLOR_GREEN},
-        {"blue", WAVE_COLOR_BLUE},
-        {"indigo", WAVE_COLOR_INDIGO},
-        {"violet", WAVE_COLOR_VIOLET},
-    };
-
-    for (guint i = 0; i < G_N_ELEMENTS(color_map); i++) {
-        if (!g_ascii_strcasecmp(color, color_map[i].name)) {
-            return color_map[i].value;
-        }
-    }
-
-    return -1;
 }
 
 static gboolean wcp_add_symbol(GwSymbol *sym, GHashTable *added_vec_roots, GArray *added_ids)
@@ -424,37 +372,6 @@ static gchar* handle_get_item_info(WcpServer *server, WcpCommand *cmd)
     return response;
 }
 
-static gchar* handle_set_item_color(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-
-    if (wcp_is_marker_id(cmd->data.set_color.id.id)) {
-        return wcp_create_error("invalid_item",
-                                "set_item_color only applies to signals",
-                                NULL);
-    }
-
-    GwTrace *t = wcp_lookup_trace(cmd->data.set_color.id.id);
-    if (!t) {
-        return wcp_create_error("invalid_item",
-                                "Unknown item id",
-                                NULL);
-    }
-
-    gint color = wcp_parse_color(cmd->data.set_color.color);
-    if (color < 0) {
-        return wcp_create_error("invalid_color",
-                                "Unsupported color value",
-                                NULL);
-    }
-
-    t->t_color = (unsigned int)color;
-    GLOBALS->signalwindow_width_dirty = 1;
-    redraw_signals_and_waves();
-
-    return wcp_create_ack();
-}
-
 static gchar* handle_add_variables(WcpServer *server, WcpCommand *cmd)
 {
     (void)server;
@@ -519,59 +436,6 @@ static gchar* handle_add_scope(WcpServer *server, WcpCommand *cmd)
     redraw_signals_and_waves();
     
     gchar *response = wcp_create_add_items_response_for("add_scope", added_ids);
-    g_array_free(added_ids, TRUE);
-    return response;
-}
-
-static gchar* handle_add_markers(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-
-    if (!wcp_has_dump_file()) {
-        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
-    }
-
-    GArray *added_ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
-    
-    if (cmd->data.add_markers.markers) {
-        GwNamedMarkers *markers = gw_project_get_named_markers(GLOBALS->project);
-        for (guint i = 0; i < cmd->data.add_markers.markers->len; i++) {
-            WcpMarkerInfo *m = &g_array_index(cmd->data.add_markers.markers,
-                                               WcpMarkerInfo, i);
-
-            GwMarker *marker = gw_named_markers_find_first_disabled(markers);
-            if (!marker) {
-                g_array_free(added_ids, TRUE);
-                return wcp_create_error("no_available_marker",
-                                        "No available named marker slots",
-                                        NULL);
-            }
-
-            gw_marker_set_position(marker, (GwTime)m->time);
-            gw_marker_set_enabled(marker, TRUE);
-            if (m->name) {
-                gw_marker_set_alias(marker, m->name);
-            }
-
-            gint idx = wcp_find_marker_index(markers, marker);
-            if (idx >= 0) {
-                WcpDisplayedItemRef ref;
-                ref.id = wcp_marker_id_from_index((guint64)idx);
-                g_array_append_val(added_ids, ref);
-            }
-
-            if (m->move_focus) {
-                GwMarker *primary_marker = gw_project_get_primary_marker(GLOBALS->project);
-                gw_marker_set_position(primary_marker, (GwTime)m->time);
-                gw_marker_set_enabled(primary_marker, TRUE);
-                update_time_box();
-            }
-        }
-    }
-    
-    redraw_signals_and_waves();
-
-    gchar *response = wcp_create_add_items_response_for("add_markers", added_ids);
     g_array_free(added_ids, TRUE);
     return response;
 }
@@ -713,42 +577,6 @@ static gchar* handle_remove_items(WcpServer *server, WcpCommand *cmd)
     return wcp_create_ack();
 }
 
-static gchar* handle_focus_item(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-    
-    if (wcp_is_marker_id(cmd->data.focus.id.id)) {
-        GwNamedMarkers *markers = gw_project_get_named_markers(GLOBALS->project);
-        guint64 idx64 = wcp_marker_index_from_id(cmd->data.focus.id.id);
-        if (idx64 > G_MAXUINT) {
-            return wcp_create_error("invalid_item", "Unknown marker id", NULL);
-        }
-        GwMarker *marker =
-            gw_named_markers_get(markers, (guint)idx64);
-        if (marker) {
-            GwMarker *primary_marker = gw_project_get_primary_marker(GLOBALS->project);
-            gw_marker_set_position(primary_marker, gw_marker_get_position(marker));
-            gw_marker_set_enabled(primary_marker, TRUE);
-            update_time_box();
-            redraw_signals_and_waves();
-            return wcp_create_ack();
-        }
-        return wcp_create_error("invalid_item", "Unknown marker id", NULL);
-    }
-
-    GwTrace *t = wcp_lookup_trace(cmd->data.focus.id.id);
-    if (!t) {
-        return wcp_create_error("invalid_item", "Unknown item id", NULL);
-    }
-
-    ClearTraces();
-    t->flags |= TR_HIGHLIGHT;
-    gw_signal_list_scroll_to_trace(GW_SIGNAL_LIST(GLOBALS->signalarea), t);
-    redraw_signals_and_waves();
-    
-    return wcp_create_ack();
-}
-
 static gchar* handle_clear(WcpServer *server, WcpCommand *cmd)
 {
     (void)server;
@@ -785,38 +613,6 @@ static gchar* handle_load(WcpServer *server, WcpCommand *cmd)
     return wcp_create_ack();
 }
 
-static gchar* handle_reload(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-    (void)cmd;
-    
-    if (!wcp_has_dump_file() || !GLOBALS->loaded_file_name) {
-        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
-    }
-
-    reload_into_new_context();
-    wcp_gtkwave_notify_waveforms_loaded(GLOBALS->loaded_file_name);
-    
-    return wcp_create_ack();
-}
-
-static gchar* handle_zoom_to_fit(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-
-    if (!wcp_has_dump_file()) {
-        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
-    }
-
-    if (cmd->data.zoom.viewport_idx != 0) {
-        return wcp_create_error("invalid_argument", "Unsupported viewport index", NULL);
-    }
-
-    service_zoom_fit(NULL, NULL);
-    
-    return wcp_create_ack();
-}
-
 static gchar* handle_shutdown(WcpServer *server, WcpCommand *cmd)
 {
     (void)cmd;
@@ -842,9 +638,6 @@ static gchar* wcp_command_handler(WcpServer *server, WcpCommand *cmd, gpointer u
         case WCP_CMD_GET_ITEM_INFO:
             return handle_get_item_info(server, cmd);
             
-        case WCP_CMD_SET_ITEM_COLOR:
-            return handle_set_item_color(server, cmd);
-            
         case WCP_CMD_ADD_VARIABLES:
             return handle_add_variables(server, cmd);
             
@@ -854,14 +647,8 @@ static gchar* wcp_command_handler(WcpServer *server, WcpCommand *cmd, gpointer u
         case WCP_CMD_ADD_ITEMS:
             return handle_add_items(server, cmd);
             
-        case WCP_CMD_ADD_MARKERS:
-            return handle_add_markers(server, cmd);
-            
         case WCP_CMD_REMOVE_ITEMS:
             return handle_remove_items(server, cmd);
-            
-        case WCP_CMD_FOCUS_ITEM:
-            return handle_focus_item(server, cmd);
             
         case WCP_CMD_CLEAR:
             return handle_clear(server, cmd);
@@ -872,14 +659,8 @@ static gchar* wcp_command_handler(WcpServer *server, WcpCommand *cmd, gpointer u
         case WCP_CMD_SET_VIEWPORT_RANGE:
             return handle_set_viewport_range(server, cmd);
             
-        case WCP_CMD_ZOOM_TO_FIT:
-            return handle_zoom_to_fit(server, cmd);
-            
         case WCP_CMD_LOAD:
             return handle_load(server, cmd);
-            
-        case WCP_CMD_RELOAD:
-            return handle_reload(server, cmd);
             
         case WCP_CMD_SHUTDOWN:
             return handle_shutdown(server, cmd);

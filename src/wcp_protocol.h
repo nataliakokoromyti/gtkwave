@@ -29,23 +29,18 @@ typedef enum {
     WCP_CMD_GET_ITEM_INFO,      /* Get info about specific items */
     
     /* Modification commands */
-    WCP_CMD_SET_ITEM_COLOR,     /* Change item color */
     WCP_CMD_ADD_VARIABLES,      /* Add signals to view */
     WCP_CMD_ADD_SCOPE,          /* Add all signals in scope */
     WCP_CMD_ADD_ITEMS,          /* Add variables or scopes */
-    WCP_CMD_ADD_MARKERS,        /* Add time markers */
     WCP_CMD_REMOVE_ITEMS,       /* Remove items from view */
-    WCP_CMD_FOCUS_ITEM,         /* Focus on specific item */
     WCP_CMD_CLEAR,              /* Remove all displayed items */
     
     /* Navigation commands */
     WCP_CMD_SET_VIEWPORT_TO,    /* Center view on timestamp */
     WCP_CMD_SET_VIEWPORT_RANGE, /* Set view to time range */
-    WCP_CMD_ZOOM_TO_FIT,        /* Zoom to show entire waveform */
     
     /* File commands */
     WCP_CMD_LOAD,               /* Load a waveform file */
-    WCP_CMD_RELOAD,             /* Reload waveform from disk */
     
     /* Control commands */
     WCP_CMD_SHUTDOWN,           /* Stop WCP server */
@@ -67,13 +62,6 @@ typedef struct {
     WcpDisplayedItemRef id;
 } WcpItemInfo;
 
-/* Marker information */
-typedef struct {
-    gint64 time;
-    gchar *name;       /* Optional */
-    gboolean move_focus;
-} WcpMarkerInfo;
-
 /* Parsed WCP command */
 typedef struct {
     WcpCommandType type;
@@ -84,12 +72,6 @@ typedef struct {
         struct {
             GArray *ids;  /* Array of WcpDisplayedItemRef */
         } item_refs;
-        
-        /* set_item_color */
-        struct {
-            WcpDisplayedItemRef id;
-            gchar *color;
-        } set_color;
         
         /* add_variables */
         struct {
@@ -108,11 +90,6 @@ typedef struct {
             gboolean recursive;
         } add_items;
         
-        /* add_markers */
-        struct {
-            GArray *markers;  /* Array of WcpMarkerInfo */
-        } add_markers;
-        
         /* set_viewport_to */
         struct {
             gint64 timestamp;
@@ -124,20 +101,10 @@ typedef struct {
             gint64 end;
         } viewport_range;
         
-        /* focus_item */
-        struct {
-            WcpDisplayedItemRef id;
-        } focus;
-        
         /* load */
         struct {
             gchar *source;
         } load;
-        
-        /* zoom_to_fit */
-        struct {
-            guint viewport_idx;
-        } zoom;
     } data;
 } WcpCommand;
 
