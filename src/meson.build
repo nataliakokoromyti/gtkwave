@@ -8,6 +8,8 @@ gtkwave_resources = gnome.compile_resources(
     c_name: 'gtkwave',
 )
 
+wcp_enabled = get_option('wcp')
+
 gtkwave_sources = [
     'analyzer.c',
     'baseconvert.c',

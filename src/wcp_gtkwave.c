@@ -2,8 +2,6 @@
  * GTKWave WCP Integration Implementation
  * 
  * Maps WCP protocol commands to GTKWave internal functions.
- * 
- * This file maps WCP protocol commands to GTKWave internals.
  */
 
 #include "wcp_gtkwave.h"
