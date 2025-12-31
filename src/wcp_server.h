@@ -77,15 +77,11 @@ void wcp_server_free(WcpServer *server);
  * @param server The server instance
  * @return Port number
  */
-guint16 wcp_server_get_port(WcpServer *server);
-
 /**
  * Check if a client is connected
  * @param server The server instance
  * @return TRUE if client is connected
  */
-gboolean wcp_server_has_client(WcpServer *server);
-
 /* ============================================================================
  * Message Sending (Server -> Client)
  * ============================================================================ */

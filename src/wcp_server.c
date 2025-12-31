@@ -229,16 +229,6 @@ void wcp_server_free(WcpServer *server)
     g_free(server);
 }
 
-guint16 wcp_server_get_port(WcpServer *server)
-{
-    return server->port;
-}
-
-gboolean wcp_server_has_client(WcpServer *server)
-{
-    return server->client_connected;
-}
-
 gboolean wcp_server_send(WcpServer *server, gchar *message)
 {
     if (!server->client_connected || !server->output_stream) {
