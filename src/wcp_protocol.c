@@ -28,14 +28,18 @@ static const gchar *supported_commands[] = {
     NULL
 };
 
-const gchar** wcp_get_supported_commands(void)
-{
-    return supported_commands;
-}
-
 static gchar* wcp_json_builder_to_string(JsonBuilder *builder)
 {
-    return wcp_json_builder_to_string(builder);
+    JsonNode *root = json_builder_get_root(builder);
+    JsonGenerator *gen = json_generator_new();
+    json_generator_set_root(gen, root);
+    gchar *json_str = json_generator_to_data(gen, NULL);
+
+    json_node_free(root);
+    g_object_unref(gen);
+    g_object_unref(builder);
+
+    return json_str;
 }
 
 /* ============================================================================
@@ -733,11 +737,6 @@ gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
     json_builder_end_object(builder);
     
     return wcp_json_builder_to_string(builder);
-}
-
-gchar* wcp_create_add_items_response(GArray *ids)
-{
-    return wcp_create_add_items_response_for("add_items", ids);
 }
 
 /* ============================================================================

@@ -160,12 +160,8 @@ gchar* wcp_create_error(const gchar *error_type,
 gchar* wcp_create_item_list_response(GArray *ids);
 gchar* wcp_create_item_info_response(GPtrArray *items);
 gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids);
-gchar* wcp_create_add_items_response(GArray *ids);
 
 /* Create JSON event messages */
 gchar* wcp_create_waveforms_loaded_event(const gchar *source);
-
-/* List of supported commands (for greeting) */
-const gchar** wcp_get_supported_commands(void);
 
 #endif /* WCP_PROTOCOL_H */
