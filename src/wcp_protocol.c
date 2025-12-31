@@ -42,10 +42,6 @@ static gchar* wcp_json_builder_to_string(JsonBuilder *builder)
     return json_str;
 }
 
-/* ============================================================================
- * Command Parsing
- * ============================================================================ */
-
 static WcpCommandType parse_command_type(const gchar *cmd_str)
 {
     if (!cmd_str) return WCP_CMD_UNKNOWN;
@@ -588,10 +584,6 @@ void wcp_command_free(WcpCommand *cmd)
     g_free(cmd);
 }
 
-/* ============================================================================
- * Response Generation
- * ============================================================================ */
-
 gchar* wcp_create_greeting(void)
 {
     JsonBuilder *builder = json_builder_new();
@@ -738,10 +730,6 @@ gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
     
     return wcp_json_builder_to_string(builder);
 }
-
-/* ============================================================================
- * Event Generation
- * ============================================================================ */
 
 gchar* wcp_create_waveforms_loaded_event(const gchar *source)
 {
