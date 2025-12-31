@@ -33,6 +33,11 @@ const gchar** wcp_get_supported_commands(void)
     return supported_commands;
 }
 
+static gchar* wcp_json_builder_to_string(JsonBuilder *builder)
+{
+    return wcp_json_builder_to_string(builder);
+}
+
 /* ============================================================================
  * Command Parsing
  * ============================================================================ */
@@ -603,16 +608,7 @@ gchar* wcp_create_greeting(void)
     
     json_builder_end_object(builder);
     
-    JsonNode *root = json_builder_get_root(builder);
-    JsonGenerator *gen = json_generator_new();
-    json_generator_set_root(gen, root);
-    gchar *json_str = json_generator_to_data(gen, NULL);
-    
-    json_node_free(root);
-    g_object_unref(gen);
-    g_object_unref(builder);
-    
-    return json_str;
+    return wcp_json_builder_to_string(builder);
 }
 
 gchar* wcp_create_ack(void)
@@ -647,16 +643,7 @@ gchar* wcp_create_error(const gchar *error_type,
     
     json_builder_end_object(builder);
     
-    JsonNode *root = json_builder_get_root(builder);
-    JsonGenerator *gen = json_generator_new();
-    json_generator_set_root(gen, root);
-    gchar *json_str = json_generator_to_data(gen, NULL);
-    
-    json_node_free(root);
-    g_object_unref(gen);
-    g_object_unref(builder);
-    
-    return json_str;
+    return wcp_json_builder_to_string(builder);
 }
 
 gchar* wcp_create_item_list_response(GArray *ids)
@@ -682,16 +669,7 @@ gchar* wcp_create_item_list_response(GArray *ids)
     
     json_builder_end_object(builder);
     
-    JsonNode *root = json_builder_get_root(builder);
-    JsonGenerator *gen = json_generator_new();
-    json_generator_set_root(gen, root);
-    gchar *json_str = json_generator_to_data(gen, NULL);
-    
-    json_node_free(root);
-    g_object_unref(gen);
-    g_object_unref(builder);
-    
-    return json_str;
+    return wcp_json_builder_to_string(builder);
 }
 
 gchar* wcp_create_item_info_response(GPtrArray *items)
@@ -728,16 +706,7 @@ gchar* wcp_create_item_info_response(GPtrArray *items)
     
     json_builder_end_object(builder);
     
-    JsonNode *root = json_builder_get_root(builder);
-    JsonGenerator *gen = json_generator_new();
-    json_generator_set_root(gen, root);
-    gchar *json_str = json_generator_to_data(gen, NULL);
-    
-    json_node_free(root);
-    g_object_unref(gen);
-    g_object_unref(builder);
-    
-    return json_str;
+    return wcp_json_builder_to_string(builder);
 }
 
 gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
@@ -763,16 +732,7 @@ gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
     
     json_builder_end_object(builder);
     
-    JsonNode *root = json_builder_get_root(builder);
-    JsonGenerator *gen = json_generator_new();
-    json_generator_set_root(gen, root);
-    gchar *json_str = json_generator_to_data(gen, NULL);
-    
-    json_node_free(root);
-    g_object_unref(gen);
-    g_object_unref(builder);
-    
-    return json_str;
+    return wcp_json_builder_to_string(builder);
 }
 
 gchar* wcp_create_add_items_response(GArray *ids)
@@ -800,16 +760,7 @@ gchar* wcp_create_waveforms_loaded_event(const gchar *source)
     
     json_builder_end_object(builder);
     
-    JsonNode *root = json_builder_get_root(builder);
-    JsonGenerator *gen = json_generator_new();
-    json_generator_set_root(gen, root);
-    gchar *json_str = json_generator_to_data(gen, NULL);
-    
-    json_node_free(root);
-    g_object_unref(gen);
-    g_object_unref(builder);
-    
-    return json_str;
+    return wcp_json_builder_to_string(builder);
 }
 
 gchar* wcp_create_goto_declaration_event(const gchar *variable)
@@ -828,14 +779,5 @@ gchar* wcp_create_goto_declaration_event(const gchar *variable)
     
     json_builder_end_object(builder);
     
-    JsonNode *root = json_builder_get_root(builder);
-    JsonGenerator *gen = json_generator_new();
-    json_generator_set_root(gen, root);
-    gchar *json_str = json_generator_to_data(gen, NULL);
-    
-    json_node_free(root);
-    g_object_unref(gen);
-    g_object_unref(builder);
-    
-    return json_str;
+    return wcp_json_builder_to_string(builder);
 }
