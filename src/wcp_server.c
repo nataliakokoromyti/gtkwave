@@ -11,7 +11,6 @@
 #ifndef WCP_DEFAULT_PORT
 #define WCP_DEFAULT_PORT 8765
 #endif
-#define WCP_BUFFER_SIZE 65536
 
 /* ============================================================================
  * Internal Functions
