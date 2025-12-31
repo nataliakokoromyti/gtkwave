@@ -70,6 +70,17 @@ gtkwave_sources = [
     'cocoa/cocoa_misc.c',
 ]
 
+wcp_enabled = get_option('wcp')
+json_glib_dep = dependency('json-glib-1.0', required: wcp_enabled)
+
+if wcp_enabled
+    gtkwave_sources += files(
+        'wcp_protocol.c',
+        'wcp_server.c',
+        'wcp_gtkwave.c',
+    )
+endif
+
 gtkwave_dependencies = [
     glib_dep,
     gtk_dep,
@@ -83,6 +94,15 @@ gtkwave_dependencies = [
     gnu_regex_dep,
     libgtkwave_dep,
 ]
+
+if wcp_enabled
+    gtkwave_dependencies += json_glib_dep
+    add_project_arguments(
+        '-DHAVE_WCP',
+        '-DWCP_DEFAULT_PORT=@0@'.format(get_option('wcp_default_port')),
+        language: 'c',
+    )
+endif
 
 gtkwave_include_directories = [
     config_inc,
