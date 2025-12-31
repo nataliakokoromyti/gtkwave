@@ -11,12 +11,7 @@
 static const gchar *supported_commands[] = {
     "get_item_list",
     "get_item_info",
-    "add_variables",
-    "add_scope",
     "add_items",
-    "remove_items",
-    "clear",
-    "set_viewport_to",
     "set_viewport_range",
     "load",
     "shutdown",
@@ -43,12 +38,7 @@ static WcpCommandType parse_command_type(const gchar *cmd_str)
     
     if (g_str_equal(cmd_str, "get_item_list"))      return WCP_CMD_GET_ITEM_LIST;
     if (g_str_equal(cmd_str, "get_item_info"))      return WCP_CMD_GET_ITEM_INFO;
-    if (g_str_equal(cmd_str, "add_variables"))      return WCP_CMD_ADD_VARIABLES;
-    if (g_str_equal(cmd_str, "add_scope"))          return WCP_CMD_ADD_SCOPE;
     if (g_str_equal(cmd_str, "add_items"))          return WCP_CMD_ADD_ITEMS;
-    if (g_str_equal(cmd_str, "remove_items"))       return WCP_CMD_REMOVE_ITEMS;
-    if (g_str_equal(cmd_str, "clear"))              return WCP_CMD_CLEAR;
-    if (g_str_equal(cmd_str, "set_viewport_to"))    return WCP_CMD_SET_VIEWPORT_TO;
     if (g_str_equal(cmd_str, "set_viewport_range")) return WCP_CMD_SET_VIEWPORT_RANGE;
     if (g_str_equal(cmd_str, "load"))               return WCP_CMD_LOAD;
     if (g_str_equal(cmd_str, "shutdown"))           return WCP_CMD_SHUTDOWN;
@@ -250,7 +240,6 @@ WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
     /* Parse command-specific fields */
     switch (cmd_type) {
         case WCP_CMD_GET_ITEM_INFO:
-        case WCP_CMD_REMOVE_ITEMS:
         {
             JsonArray *arr = NULL;
             if (!json_object_require_array(obj, "ids", &arr, error)) {
@@ -263,43 +252,6 @@ WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
                 g_object_unref(parser);
                 wcp_command_free(cmd);
                 return NULL;
-            }
-            break;
-        }
-        case WCP_CMD_ADD_VARIABLES:
-        {
-            JsonArray *arr = NULL;
-            if (!json_object_require_array(obj, "variables", &arr, error)) {
-                g_object_unref(parser);
-                wcp_command_free(cmd);
-                return NULL;
-            }
-            cmd->data.add_vars.variables = parse_string_array(arr, error, "variables");
-            if (!cmd->data.add_vars.variables) {
-                g_object_unref(parser);
-                wcp_command_free(cmd);
-                return NULL;
-            }
-            break;
-        }
-        case WCP_CMD_ADD_SCOPE:
-        {
-            if (!json_object_require_string(obj, "scope", &cmd->data.add_scope.scope, error)) {
-                g_object_unref(parser);
-                wcp_command_free(cmd);
-                return NULL;
-            }
-            if (json_object_has_member(obj, "recursive")) {
-                JsonNode *node = json_object_get_member(obj, "recursive");
-                if (!JSON_NODE_HOLDS_VALUE(node) ||
-                    json_node_get_value_type(node) != G_TYPE_BOOLEAN) {
-                    g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
-                                "Field 'recursive' must be a boolean");
-                    g_object_unref(parser);
-                    wcp_command_free(cmd);
-                    return NULL;
-                }
-                cmd->data.add_scope.recursive = json_node_get_boolean(node);
             }
             break;
         }
@@ -331,15 +283,6 @@ WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
             }
             break;
         }
-        case WCP_CMD_SET_VIEWPORT_TO:
-            if (!json_object_require_int64(obj, "timestamp",
-                                           &cmd->data.viewport_to.timestamp, error)) {
-                g_object_unref(parser);
-                wcp_command_free(cmd);
-                return NULL;
-            }
-            break;
-
         case WCP_CMD_SET_VIEWPORT_RANGE:
             if (!json_object_require_int64(obj, "start", &cmd->data.viewport_range.start, error) ||
                 !json_object_require_int64(obj, "end", &cmd->data.viewport_range.end, error)) {
@@ -376,16 +319,6 @@ void wcp_command_free(WcpCommand *cmd)
             if (cmd->data.item_refs.ids) {
                 g_array_free(cmd->data.item_refs.ids, TRUE);
             }
-            break;
-            
-        case WCP_CMD_ADD_VARIABLES:
-            if (cmd->data.add_vars.variables) {
-                g_ptr_array_free(cmd->data.add_vars.variables, TRUE);
-            }
-            break;
-            
-        case WCP_CMD_ADD_SCOPE:
-            g_free(cmd->data.add_scope.scope);
             break;
             
         case WCP_CMD_ADD_ITEMS:

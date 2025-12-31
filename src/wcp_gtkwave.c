@@ -10,11 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "analyzer.h"
-#include "currenttime.h"
 #include "globals.h"
 #include "lx2.h"
-#include "menu.h"
-#include "signal_list.h"
 #include "symbol.h"
 #include "wavewindow.h"
 
@@ -372,74 +369,6 @@ static gchar* handle_get_item_info(WcpServer *server, WcpCommand *cmd)
     return response;
 }
 
-static gchar* handle_add_variables(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-    
-    if (!wcp_has_dump_file()) {
-        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
-    }
-
-    GArray *added_ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
-    
-    if (cmd->data.add_vars.variables) {
-        GHashTable *added_vec_roots = g_hash_table_new(g_direct_hash, g_direct_equal);
-        for (guint i = 0; i < cmd->data.add_vars.variables->len; i++) {
-            const gchar *varname = g_ptr_array_index(cmd->data.add_vars.variables, i);
-
-            GwSymbol *sym = gw_dump_file_lookup_symbol(GLOBALS->dump_file, varname);
-            if (sym) {
-                wcp_add_symbol(sym, added_vec_roots, added_ids);
-            }
-        }
-        g_hash_table_destroy(added_vec_roots);
-    }
-    
-    GLOBALS->signalwindow_width_dirty = 1;
-    MaxSignalLength();
-    redraw_signals_and_waves();
-    
-    gchar *response = wcp_create_add_items_response_for("add_variables", added_ids);
-    g_array_free(added_ids, TRUE);
-    return response;
-}
-
-static gchar* handle_add_scope(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-    
-    if (!wcp_has_dump_file()) {
-        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
-    }
-
-    GArray *added_ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
-    
-    GwTreeNode *scope = wcp_find_scope_node(cmd->data.add_scope.scope);
-    if (!scope) {
-        g_array_free(added_ids, TRUE);
-        return wcp_create_error("invalid_scope", "Scope not found", NULL);
-    }
-
-    GPtrArray *symbols = g_ptr_array_new();
-    wcp_collect_scope_symbols(scope->child, cmd->data.add_scope.recursive, symbols);
-
-    GHashTable *added_vec_roots = g_hash_table_new(g_direct_hash, g_direct_equal);
-    for (guint i = 0; i < symbols->len; i++) {
-        GwSymbol *sym = g_ptr_array_index(symbols, i);
-        wcp_add_symbol(sym, added_vec_roots, added_ids);
-    }
-    g_hash_table_destroy(added_vec_roots);
-    g_ptr_array_free(symbols, TRUE);
-    
-    GLOBALS->signalwindow_width_dirty = 1;
-    MaxSignalLength();
-    redraw_signals_and_waves();
-    
-    gchar *response = wcp_create_add_items_response_for("add_scope", added_ids);
-    g_array_free(added_ids, TRUE);
-    return response;
-}
-
 static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
 {
     (void)server;
@@ -483,41 +412,6 @@ static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
     return response;
 }
 
-static gchar* handle_set_viewport_to(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-
-    if (!wcp_has_dump_file()) {
-        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
-    }
-
-    GwTime target = (GwTime)cmd->data.viewport_to.timestamp;
-    GwTime width = (GwTime)(GLOBALS->wavewidth * GLOBALS->nspx);
-    GwTime max_width = GLOBALS->tims.last - GLOBALS->tims.first;
-
-    if (width <= 0 || width > max_width) {
-        width = max_width;
-    }
-
-    GwTime start = target - (width / 2);
-    if (start < GLOBALS->tims.first) {
-        start = GLOBALS->tims.first;
-    }
-    if (start > GLOBALS->tims.last - width + 1) {
-        start = GLOBALS->tims.last - width + 1;
-    }
-    if (start < GLOBALS->tims.first) {
-        start = GLOBALS->tims.first;
-    }
-
-    GtkAdjustment *hadj = GTK_ADJUSTMENT(GLOBALS->wave_hslider);
-    gtk_adjustment_set_value(hadj, start);
-    GLOBALS->tims.timecache = start;
-    time_update();
-    
-    return wcp_create_ack();
-}
-
 static gchar* handle_set_viewport_range(WcpServer *server, WcpCommand *cmd)
 {
     (void)server;
@@ -535,63 +429,6 @@ static gchar* handle_set_viewport_range(WcpServer *server, WcpCommand *cmd)
     }
 
     service_dragzoom(start, end);
-    
-    return wcp_create_ack();
-}
-
-static gchar* handle_remove_items(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-    
-    if (cmd->data.item_refs.ids) {
-        for (guint i = 0; i < cmd->data.item_refs.ids->len; i++) {
-            WcpDisplayedItemRef *ref = &g_array_index(cmd->data.item_refs.ids,
-                                                       WcpDisplayedItemRef, i);
-            if (wcp_is_marker_id(ref->id)) {
-                GwNamedMarkers *markers = gw_project_get_named_markers(GLOBALS->project);
-                guint64 idx64 = wcp_marker_index_from_id(ref->id);
-                if (idx64 > G_MAXUINT) {
-                    continue;
-                }
-                GwMarker *marker =
-                    gw_named_markers_get(markers, (guint)idx64);
-                if (marker) {
-                    gw_marker_set_enabled(marker, FALSE);
-                    gw_marker_set_alias(marker, NULL);
-                }
-                continue;
-            }
-
-            GwTrace *t = wcp_lookup_trace(ref->id);
-            if (t) {
-                wcp_remove_trace_id(t);
-                RemoveTrace(t, 1);
-            }
-        }
-    }
-    
-    GLOBALS->signalwindow_width_dirty = 1;
-    MaxSignalLength();
-    redraw_signals_and_waves();
-    
-    return wcp_create_ack();
-}
-
-static gchar* handle_clear(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-    (void)cmd;
-    
-    while (GLOBALS->traces.first) {
-        GwTrace *t = GLOBALS->traces.first;
-        wcp_remove_trace_id(t);
-        RemoveTrace(t, 1);
-    }
-
-    collect_all_named_markers(NULL, 0, NULL);
-    GLOBALS->signalwindow_width_dirty = 1;
-    MaxSignalLength();
-    redraw_signals_and_waves();
     
     return wcp_create_ack();
 }
@@ -638,23 +475,8 @@ static gchar* wcp_command_handler(WcpServer *server, WcpCommand *cmd, gpointer u
         case WCP_CMD_GET_ITEM_INFO:
             return handle_get_item_info(server, cmd);
             
-        case WCP_CMD_ADD_VARIABLES:
-            return handle_add_variables(server, cmd);
-            
-        case WCP_CMD_ADD_SCOPE:
-            return handle_add_scope(server, cmd);
-            
         case WCP_CMD_ADD_ITEMS:
             return handle_add_items(server, cmd);
-            
-        case WCP_CMD_REMOVE_ITEMS:
-            return handle_remove_items(server, cmd);
-            
-        case WCP_CMD_CLEAR:
-            return handle_clear(server, cmd);
-            
-        case WCP_CMD_SET_VIEWPORT_TO:
-            return handle_set_viewport_to(server, cmd);
             
         case WCP_CMD_SET_VIEWPORT_RANGE:
             return handle_set_viewport_range(server, cmd);

@@ -27,21 +27,16 @@ typedef enum {
     /* Query commands */
     WCP_CMD_GET_ITEM_LIST,      /* Get list of displayed items */
     WCP_CMD_GET_ITEM_INFO,      /* Get info about specific items */
-    
+
     /* Modification commands */
-    WCP_CMD_ADD_VARIABLES,      /* Add signals to view */
-    WCP_CMD_ADD_SCOPE,          /* Add all signals in scope */
     WCP_CMD_ADD_ITEMS,          /* Add variables or scopes */
-    WCP_CMD_REMOVE_ITEMS,       /* Remove items from view */
-    WCP_CMD_CLEAR,              /* Remove all displayed items */
-    
+
     /* Navigation commands */
-    WCP_CMD_SET_VIEWPORT_TO,    /* Center view on timestamp */
     WCP_CMD_SET_VIEWPORT_RANGE, /* Set view to time range */
-    
+
     /* File commands */
     WCP_CMD_LOAD,               /* Load a waveform file */
-    
+
     /* Control commands */
     WCP_CMD_SHUTDOWN,           /* Stop WCP server */
 } WcpCommandType;
@@ -68,32 +63,16 @@ typedef struct {
     
     /* Command-specific data */
     union {
-        /* get_item_info, remove_items */
+        /* get_item_info */
         struct {
             GArray *ids;  /* Array of WcpDisplayedItemRef */
         } item_refs;
-        
-        /* add_variables */
-        struct {
-            GPtrArray *variables;  /* Array of gchar* */
-        } add_vars;
-        
-        /* add_scope */
-        struct {
-            gchar *scope;
-            gboolean recursive;
-        } add_scope;
         
         /* add_items */
         struct {
             GPtrArray *items;  /* Array of gchar* */
             gboolean recursive;
         } add_items;
-        
-        /* set_viewport_to */
-        struct {
-            gint64 timestamp;
-        } viewport_to;
         
         /* set_viewport_range */
         struct {
