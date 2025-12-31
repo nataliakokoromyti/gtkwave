@@ -82,13 +82,6 @@ void wcp_server_free(WcpServer *server);
  */
 gboolean wcp_server_send(WcpServer *server, gchar *message);
 
-/**
- * Send a waveforms_loaded event to the connected client
- * @param server The server instance
- * @param source Source filename
- */
-void wcp_server_emit_waveforms_loaded(WcpServer *server, const gchar *source);
-
 /* ============================================================================
  * Initiating Connection (for --wcp-initiate mode)
  * ============================================================================ */

@@ -18,8 +18,6 @@
 /* Global WCP server instance */
 WcpServer *g_wcp_server = NULL;
 
-#define WCP_ITEM_MARKER_FLAG (1ull << 62)
-
 static GHashTable *wcp_trace_to_id = NULL;
 static GHashTable *wcp_id_to_trace = NULL;
 static guint64 wcp_next_trace_id = 1;
@@ -135,21 +133,6 @@ static GwTrace *wcp_lookup_trace(guint64 id)
         return NULL;
     }
     return t;
-}
-
-static gboolean wcp_is_marker_id(guint64 id)
-{
-    return (id & WCP_ITEM_MARKER_FLAG) != 0;
-}
-
-static guint64 wcp_marker_index_from_id(guint64 id)
-{
-    return id & ~WCP_ITEM_MARKER_FLAG;
-}
-
-static guint64 wcp_marker_id_from_index(guint64 idx)
-{
-    return WCP_ITEM_MARKER_FLAG | idx;
 }
 
 static gboolean wcp_has_dump_file(void)
@@ -301,19 +284,6 @@ static gchar* handle_get_item_list(WcpServer *server, WcpCommand *cmd)
         g_array_append_val(ids, ref);
     }
 
-    if (GLOBALS->project) {
-        GwNamedMarkers *markers = gw_project_get_named_markers(GLOBALS->project);
-        guint count = gw_named_markers_get_number_of_markers(markers);
-        for (guint i = 0; i < count; i++) {
-            GwMarker *marker = gw_named_markers_get(markers, i);
-            if (marker && gw_marker_is_enabled(marker)) {
-                WcpDisplayedItemRef ref;
-                ref.id = wcp_marker_id_from_index(i);
-                g_array_append_val(ids, ref);
-            }
-        }
-    }
-    
     gchar *response = wcp_create_item_list_response(ids);
     g_array_free(ids, TRUE);
     return response;
@@ -329,27 +299,6 @@ static gchar* handle_get_item_info(WcpServer *server, WcpCommand *cmd)
         for (guint i = 0; i < cmd->data.item_refs.ids->len; i++) {
             WcpDisplayedItemRef *ref = &g_array_index(cmd->data.item_refs.ids,
                                                        WcpDisplayedItemRef, i);
-
-            if (wcp_is_marker_id(ref->id)) {
-                GwNamedMarkers *markers = gw_project_get_named_markers(GLOBALS->project);
-                guint64 idx64 = wcp_marker_index_from_id(ref->id);
-                if (idx64 > G_MAXUINT) {
-                    g_ptr_array_free(results, TRUE);
-                    return wcp_create_error("invalid_item", "Unknown marker id", NULL);
-                }
-                guint idx = (guint)idx64;
-                GwMarker *marker = gw_named_markers_get(markers, idx);
-                if (!marker || !gw_marker_is_enabled(marker)) {
-                    g_ptr_array_free(results, TRUE);
-                    return wcp_create_error("invalid_item", "Unknown marker id", NULL);
-                }
-                WcpItemInfo *info = g_new0(WcpItemInfo, 1);
-                info->id = *ref;
-                info->name = g_strdup(gw_marker_get_display_name(marker));
-                info->type = g_strdup("marker");
-                g_ptr_array_add(results, info);
-                continue;
-            }
 
             GwTrace *t = wcp_lookup_trace(ref->id);
             if (!t) {
@@ -549,9 +498,3 @@ void wcp_gtkwave_shutdown(void)
     wcp_trace_map_free();
 }
 
-void wcp_gtkwave_notify_waveforms_loaded(const gchar *filename)
-{
-    if (g_wcp_server) {
-        wcp_server_emit_waveforms_loaded(g_wcp_server, filename);
-    }
-}

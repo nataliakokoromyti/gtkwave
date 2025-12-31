@@ -257,14 +257,6 @@ gboolean wcp_server_send(WcpServer *server, gchar *message)
     return success;
 }
 
-void wcp_server_emit_waveforms_loaded(WcpServer *server, const gchar *source)
-{
-    if (!server->client_connected) return;
-    
-    gchar *event = wcp_create_waveforms_loaded_event(source);
-    wcp_server_send(server, event);
-}
-
 gboolean wcp_server_initiate(WcpServer *server,
                              const gchar *host,
                              guint16 port,

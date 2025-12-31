@@ -1546,12 +1546,6 @@ loader_check_head:
         gw_marker_set_enabled(gw_project_get_baseline_marker(GLOBALS->project), FALSE);
         gw_marker_set_enabled(gw_project_get_ghost_marker(GLOBALS->project), FALSE);
 
-#ifdef HAVE_WCP
-        if (GLOBALS->loaded_file_name) {
-            wcp_gtkwave_notify_waveforms_loaded(GLOBALS->loaded_file_name);
-        }
-#endif
-
         if (gw_time_range_get_end(time_range) >> DBL_MANT_DIG) {
             fprintf(stderr,
                     "GTKWAVE | Warning: max_time bits > DBL_MANT_DIG (%d), GUI may malfunction!\n",

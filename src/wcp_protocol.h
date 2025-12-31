@@ -107,7 +107,4 @@ gchar* wcp_create_item_list_response(GArray *ids);
 gchar* wcp_create_item_info_response(GPtrArray *items);
 gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids);
 
-/* Create JSON event messages */
-gchar* wcp_create_waveforms_loaded_event(const gchar *source);
-
 #endif /* WCP_PROTOCOL_H */

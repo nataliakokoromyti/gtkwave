@@ -485,22 +485,3 @@ gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
     return wcp_json_builder_to_string(builder);
 }
 
-gchar* wcp_create_waveforms_loaded_event(const gchar *source)
-{
-    JsonBuilder *builder = json_builder_new();
-    
-    json_builder_begin_object(builder);
-    json_builder_set_member_name(builder, "type");
-    json_builder_add_string_value(builder, "event");
-    
-    json_builder_set_member_name(builder, "event");
-    json_builder_add_string_value(builder, "waveforms_loaded");
-    
-    json_builder_set_member_name(builder, "source");
-    json_builder_add_string_value(builder, source);
-    
-    json_builder_end_object(builder);
-    
-    return wcp_json_builder_to_string(builder);
-}
-

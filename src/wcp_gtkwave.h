@@ -40,14 +40,4 @@ gboolean wcp_gtkwave_initiate(const gchar *host, guint16 port);
  */
 void wcp_gtkwave_shutdown(void);
 
-/* ============================================================================
- * Event Emission (call these from GTKWave code)
- * ============================================================================ */
-
-/**
- * Notify WCP client that waveforms have been loaded
- * Call this after successful file load
- */
-void wcp_gtkwave_notify_waveforms_loaded(const gchar *filename);
-
 #endif /* WCP_GTKWAVE_H */
