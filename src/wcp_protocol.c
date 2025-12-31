@@ -10,7 +10,6 @@
 /* Supported commands for greeting */
 static const gchar *supported_commands[] = {
     "get_item_list",
-    "get_item_info",
     "add_items",
     "set_viewport_range",
     "load",
@@ -37,7 +36,6 @@ static WcpCommandType parse_command_type(const gchar *cmd_str)
     if (!cmd_str) return WCP_CMD_UNKNOWN;
     
     if (g_str_equal(cmd_str, "get_item_list"))      return WCP_CMD_GET_ITEM_LIST;
-    if (g_str_equal(cmd_str, "get_item_info"))      return WCP_CMD_GET_ITEM_INFO;
     if (g_str_equal(cmd_str, "add_items"))          return WCP_CMD_ADD_ITEMS;
     if (g_str_equal(cmd_str, "set_viewport_range")) return WCP_CMD_SET_VIEWPORT_RANGE;
     if (g_str_equal(cmd_str, "load"))               return WCP_CMD_LOAD;
@@ -124,48 +122,6 @@ static gboolean json_object_require_int64(JsonObject *obj,
     return FALSE;
 }
 
-static GArray* parse_id_array(JsonArray *arr, GError **error)
-{
-    GArray *ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
-    guint len = json_array_get_length(arr);
-    
-    for (guint i = 0; i < len; i++) {
-        JsonNode *node = json_array_get_element(arr, i);
-        if (!JSON_NODE_HOLDS_VALUE(node)) {
-            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
-                        "ids[%u] must be a number", i);
-            g_array_free(ids, TRUE);
-            return NULL;
-        }
-
-        GType type = json_node_get_value_type(node);
-        gint64 value = 0;
-        if (type == G_TYPE_INT64) {
-            value = json_node_get_int(node);
-        } else if (type == G_TYPE_DOUBLE) {
-            value = (gint64)json_node_get_double(node);
-        } else {
-            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
-                        "ids[%u] must be a number", i);
-            g_array_free(ids, TRUE);
-            return NULL;
-        }
-
-        if (value < 0) {
-            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
-                        "ids[%u] must be non-negative", i);
-            g_array_free(ids, TRUE);
-            return NULL;
-        }
-
-        WcpDisplayedItemRef ref;
-        ref.id = (guint64)value;
-        g_array_append_val(ids, ref);
-    }
-    
-    return ids;
-}
-
 static GPtrArray* parse_string_array(JsonArray *arr, GError **error, const gchar *label)
 {
     GPtrArray *strings = g_ptr_array_new_with_free_func(g_free);
@@ -239,22 +195,6 @@ WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
     
     /* Parse command-specific fields */
     switch (cmd_type) {
-        case WCP_CMD_GET_ITEM_INFO:
-        {
-            JsonArray *arr = NULL;
-            if (!json_object_require_array(obj, "ids", &arr, error)) {
-                g_object_unref(parser);
-                wcp_command_free(cmd);
-                return NULL;
-            }
-            cmd->data.item_refs.ids = parse_id_array(arr, error);
-            if (!cmd->data.item_refs.ids) {
-                g_object_unref(parser);
-                wcp_command_free(cmd);
-                return NULL;
-            }
-            break;
-        }
         case WCP_CMD_ADD_ITEMS:
         {
             JsonArray *arr = NULL;
@@ -314,13 +254,6 @@ void wcp_command_free(WcpCommand *cmd)
     if (!cmd) return;
     
     switch (cmd->type) {
-        case WCP_CMD_GET_ITEM_INFO:
-        case WCP_CMD_REMOVE_ITEMS:
-            if (cmd->data.item_refs.ids) {
-                g_array_free(cmd->data.item_refs.ids, TRUE);
-            }
-            break;
-            
         case WCP_CMD_ADD_ITEMS:
             if (cmd->data.add_items.items) {
                 g_ptr_array_free(cmd->data.add_items.items, TRUE);
@@ -413,43 +346,6 @@ gchar* wcp_create_item_list_response(GArray *ids)
         for (guint i = 0; i < ids->len; i++) {
             WcpDisplayedItemRef *ref = &g_array_index(ids, WcpDisplayedItemRef, i);
             json_builder_add_int_value(builder, (gint64)ref->id);
-        }
-    }
-    json_builder_end_array(builder);
-    
-    json_builder_end_object(builder);
-    
-    return wcp_json_builder_to_string(builder);
-}
-
-gchar* wcp_create_item_info_response(GPtrArray *items)
-{
-    JsonBuilder *builder = json_builder_new();
-    
-    json_builder_begin_object(builder);
-    json_builder_set_member_name(builder, "type");
-    json_builder_add_string_value(builder, "response");
-    
-    json_builder_set_member_name(builder, "command");
-    json_builder_add_string_value(builder, "get_item_info");
-    
-    json_builder_set_member_name(builder, "results");
-    json_builder_begin_array(builder);
-    if (items) {
-        for (guint i = 0; i < items->len; i++) {
-            WcpItemInfo *info = g_ptr_array_index(items, i);
-            json_builder_begin_object(builder);
-            
-            json_builder_set_member_name(builder, "name");
-            json_builder_add_string_value(builder, info->name);
-            
-            json_builder_set_member_name(builder, "type");
-            json_builder_add_string_value(builder, info->type);
-            
-            json_builder_set_member_name(builder, "id");
-            json_builder_add_int_value(builder, (gint64)info->id.id);
-            
-            json_builder_end_object(builder);
         }
     }
     json_builder_end_array(builder);

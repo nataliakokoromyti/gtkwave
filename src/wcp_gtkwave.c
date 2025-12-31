@@ -140,17 +140,6 @@ static gboolean wcp_has_dump_file(void)
     return GLOBALS->dump_file != NULL && GLOBALS->loaded_file_type != MISSING_FILE;
 }
 
-static void wcp_item_info_free(gpointer data)
-{
-    WcpItemInfo *info = data;
-    if (!info) {
-        return;
-    }
-    g_free(info->name);
-    g_free(info->type);
-    g_free(info);
-}
-
 static gboolean wcp_add_symbol(GwSymbol *sym, GHashTable *added_vec_roots, GArray *added_ids)
 {
     GwTrace *added_trace = NULL;
@@ -289,35 +278,6 @@ static gchar* handle_get_item_list(WcpServer *server, WcpCommand *cmd)
     return response;
 }
 
-static gchar* handle_get_item_info(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-    
-    GPtrArray *results = g_ptr_array_new_with_free_func(wcp_item_info_free);
-    
-    if (cmd->data.item_refs.ids) {
-        for (guint i = 0; i < cmd->data.item_refs.ids->len; i++) {
-            WcpDisplayedItemRef *ref = &g_array_index(cmd->data.item_refs.ids,
-                                                       WcpDisplayedItemRef, i);
-
-            GwTrace *t = wcp_lookup_trace(ref->id);
-            if (!t) {
-                g_ptr_array_free(results, TRUE);
-                return wcp_create_error("invalid_item", "Unknown item id", NULL);
-            }
-            WcpItemInfo *info = g_new0(WcpItemInfo, 1);
-            info->id = *ref;
-            info->name = g_strdup(t->name ? t->name : "");
-            info->type = g_strdup("signal");
-            g_ptr_array_add(results, info);
-        }
-    }
-    
-    gchar *response = wcp_create_item_info_response(results);
-    g_ptr_array_free(results, TRUE);
-    return response;
-}
-
 static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
 {
     (void)server;
@@ -420,9 +380,6 @@ static gchar* wcp_command_handler(WcpServer *server, WcpCommand *cmd, gpointer u
     switch (cmd->type) {
         case WCP_CMD_GET_ITEM_LIST:
             return handle_get_item_list(server, cmd);
-            
-        case WCP_CMD_GET_ITEM_INFO:
-            return handle_get_item_info(server, cmd);
             
         case WCP_CMD_ADD_ITEMS:
             return handle_add_items(server, cmd);

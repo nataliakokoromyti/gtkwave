@@ -26,7 +26,6 @@ typedef enum {
     
     /* Query commands */
     WCP_CMD_GET_ITEM_LIST,      /* Get list of displayed items */
-    WCP_CMD_GET_ITEM_INFO,      /* Get info about specific items */
 
     /* Modification commands */
     WCP_CMD_ADD_ITEMS,          /* Add variables or scopes */
@@ -50,24 +49,12 @@ typedef struct {
     guint64 id;
 } WcpDisplayedItemRef;
 
-/* Information about an item */
-typedef struct {
-    gchar *name;
-    gchar *type;  /* "signal", "marker" */
-    WcpDisplayedItemRef id;
-} WcpItemInfo;
-
 /* Parsed WCP command */
 typedef struct {
     WcpCommandType type;
     
     /* Command-specific data */
     union {
-        /* get_item_info */
-        struct {
-            GArray *ids;  /* Array of WcpDisplayedItemRef */
-        } item_refs;
-        
         /* add_items */
         struct {
             GPtrArray *items;  /* Array of gchar* */
@@ -104,7 +91,6 @@ gchar* wcp_create_error(const gchar *error_type,
                         const gchar *message,
                         GPtrArray *arguments);
 gchar* wcp_create_item_list_response(GArray *ids);
-gchar* wcp_create_item_info_response(GPtrArray *items);
 gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids);
 
 #endif /* WCP_PROTOCOL_H */
