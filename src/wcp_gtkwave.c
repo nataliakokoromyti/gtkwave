@@ -777,8 +777,6 @@ static gchar* handle_zoom_to_fit(WcpServer *server, WcpCommand *cmd)
 
 static gchar* handle_shutdown(WcpServer *server, WcpCommand *cmd)
 {
-    (void)cmd;
-    
     /* Stop the WCP server (but don't quit GTKWave) */
     wcp_server_stop(server);
     
