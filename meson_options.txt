@@ -78,7 +78,7 @@ option(
 option(
     'wcp',
     type: 'boolean',
-    value: true,
+    value: false,
     description: 'Enable WCP (Waveform Control Protocol) support',
 )
 
