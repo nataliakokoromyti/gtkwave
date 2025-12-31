@@ -940,11 +940,6 @@ void wcp_gtkwave_shutdown(void)
     wcp_trace_map_free();
 }
 
-gboolean wcp_gtkwave_is_active(void)
-{
-    return g_wcp_server != NULL && wcp_server_has_client(g_wcp_server);
-}
-
 void wcp_gtkwave_notify_waveforms_loaded(const gchar *filename)
 {
     if (g_wcp_server) {

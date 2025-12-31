@@ -44,11 +44,6 @@ gboolean wcp_gtkwave_initiate(const gchar *host, guint16 port);
  */
 void wcp_gtkwave_shutdown(void);
 
-/**
- * Check if WCP is active
- */
-gboolean wcp_gtkwave_is_active(void);
-
 /* ============================================================================
  * Event Emission (call these from GTKWave code)
  * ============================================================================ */
