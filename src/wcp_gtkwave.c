@@ -3,9 +3,7 @@
  * 
  * Maps WCP protocol commands to GTKWave internal functions.
  * 
- * IMPORTANT: This file contains PLACEHOLDER implementations.
- * Each function needs to be connected to actual GTKWave internals.
- * Search for "TODO(gtkwave)" comments to find integration points.
+ * This file maps WCP protocol commands to GTKWave internals.
  */
 
 #include "wcp_gtkwave.h"
@@ -962,19 +960,5 @@ void wcp_gtkwave_notify_goto_declaration(const gchar *variable)
 {
     if (g_wcp_server) {
         wcp_server_emit_goto_declaration(g_wcp_server, variable);
-    }
-}
-
-void wcp_gtkwave_notify_add_drivers(const gchar *variable)
-{
-    if (g_wcp_server) {
-        wcp_server_emit_add_drivers(g_wcp_server, variable);
-    }
-}
-
-void wcp_gtkwave_notify_add_loads(const gchar *variable)
-{
-    if (g_wcp_server) {
-        wcp_server_emit_add_loads(g_wcp_server, variable);
     }
 }

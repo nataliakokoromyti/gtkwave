@@ -52,33 +52,6 @@ typedef enum {
 } WcpCommandType;
 
 /* ============================================================================
- * WCP Response Types (Server -> Client)
- * ============================================================================ */
-
-typedef enum {
-    WCP_RESP_GREETING,
-    WCP_RESP_ACK,
-    WCP_RESP_ERROR,
-    WCP_RESP_GET_ITEM_LIST,
-    WCP_RESP_GET_ITEM_INFO,
-    WCP_RESP_ADD_ITEMS,
-    WCP_RESP_ADD_VARIABLES,
-    WCP_RESP_ADD_SCOPE,
-    WCP_RESP_ADD_MARKERS,
-} WcpResponseType;
-
-/* ============================================================================
- * WCP Event Types (Server -> Client, unsolicited)
- * ============================================================================ */
-
-typedef enum {
-    WCP_EVENT_WAVEFORMS_LOADED,
-    WCP_EVENT_GOTO_DECLARATION,
-    WCP_EVENT_ADD_DRIVERS,
-    WCP_EVENT_ADD_LOADS,
-} WcpEventType;
-
-/* ============================================================================
  * Data Structures
  * ============================================================================ */
 
@@ -192,8 +165,6 @@ gchar* wcp_create_add_items_response(GArray *ids);
 /* Create JSON event messages */
 gchar* wcp_create_waveforms_loaded_event(const gchar *source);
 gchar* wcp_create_goto_declaration_event(const gchar *variable);
-gchar* wcp_create_add_drivers_event(const gchar *variable);
-gchar* wcp_create_add_loads_event(const gchar *variable);
 
 /* List of supported commands (for greeting) */
 const gchar** wcp_get_supported_commands(void);
