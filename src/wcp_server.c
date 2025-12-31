@@ -294,6 +294,22 @@ void wcp_server_emit_goto_declaration(WcpServer *server, const gchar *variable)
     wcp_server_send(server, event);
 }
 
+void wcp_server_emit_add_drivers(WcpServer *server, const gchar *variable)
+{
+    if (!server->client_connected) return;
+
+    gchar *event = wcp_create_add_drivers_event(variable);
+    wcp_server_send(server, event);
+}
+
+void wcp_server_emit_add_loads(WcpServer *server, const gchar *variable)
+{
+    if (!server->client_connected) return;
+
+    gchar *event = wcp_create_add_loads_event(variable);
+    wcp_server_send(server, event);
+}
+
 gboolean wcp_server_initiate(WcpServer *server,
                              const gchar *host,
                              guint16 port,

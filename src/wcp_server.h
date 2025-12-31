@@ -106,6 +106,8 @@ gboolean wcp_server_send(WcpServer *server, gchar *message);
  */
 void wcp_server_emit_waveforms_loaded(WcpServer *server, const gchar *source);
 void wcp_server_emit_goto_declaration(WcpServer *server, const gchar *variable);
+void wcp_server_emit_add_drivers(WcpServer *server, const gchar *variable);
+void wcp_server_emit_add_loads(WcpServer *server, const gchar *variable);
 
 /* ============================================================================
  * Initiating Connection (for --wcp-initiate mode)

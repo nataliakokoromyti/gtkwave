@@ -30,6 +30,10 @@
 
 #include "wave_locale.h"
 
+#ifdef HAVE_WCP
+#include "wcp_gtkwave.h"
+#endif
+
 #if !defined __MINGW32__
 #include <signal.h>
 #include <sys/types.h>
@@ -689,6 +693,10 @@ int main_2(int opt_vcd, int argc, char *argv[])
     char *wname = NULL;
     char *override_rc = NULL;
     FILE *wave = NULL;
+#ifdef HAVE_WCP
+    int wcp_port = -1;
+    const char *wcp_initiate_address = NULL;
+#endif
 
     GtkWidget *main_vbox = NULL, *top_table = NULL, *whole_table = NULL;
     GtkWidget *menubar;
@@ -1254,6 +1262,42 @@ do_primary_inits:
             }
         }
     }
+
+#ifdef HAVE_WCP
+    if (wcp_initiate_address) {
+        char *address_copy = strdup_2(wcp_initiate_address);
+        char *sep = strrchr(address_copy, ':');
+        if (!sep || sep == address_copy || !*(sep + 1)) {
+            fprintf(stderr,
+                    "GTKWAVE | Invalid --wcp-initiate (expected HOST:PORT)\n");
+            free_2(address_copy);
+            exit(255);
+        }
+        *sep = '\0';
+        char *host = address_copy;
+        char *port_str = sep + 1;
+        char *endptr = NULL;
+        long port_val = strtol(port_str, &endptr, 10);
+        if (!endptr || *endptr != '\0' || port_val <= 0 || port_val > 65535) {
+            fprintf(stderr,
+                    "GTKWAVE | Invalid --wcp-initiate port: %s\n",
+                    port_str);
+            free_2(address_copy);
+            exit(255);
+        }
+        if (!wcp_gtkwave_initiate(host, (guint16)port_val)) {
+            fprintf(stderr, "GTKWAVE | WCP initiate failed\n");
+        }
+        free_2(address_copy);
+    } else if (wcp_port >= 0) {
+        if (wcp_port == 0) {
+            wcp_port = WCP_DEFAULT_PORT;
+        }
+        if (!wcp_gtkwave_init((guint16)wcp_port)) {
+            fprintf(stderr, "GTKWAVE | WCP server failed to start\n");
+        }
+    }
+#endif
 
     /* attempt to load a dump+save file if only a savefile is specified at the command line */
     if ((GLOBALS->loaded_file_name) && (!wname) &&

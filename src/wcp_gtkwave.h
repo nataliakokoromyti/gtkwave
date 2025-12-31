@@ -64,5 +64,7 @@ void wcp_gtkwave_notify_waveforms_loaded(const gchar *filename);
  * Call this when user requests to jump to source
  */
 void wcp_gtkwave_notify_goto_declaration(const gchar *variable);
+void wcp_gtkwave_notify_add_drivers(const gchar *variable);
+void wcp_gtkwave_notify_add_loads(const gchar *variable);
 
 #endif /* WCP_GTKWAVE_H */

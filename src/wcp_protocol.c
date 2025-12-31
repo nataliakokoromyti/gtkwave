@@ -61,50 +61,219 @@ static WcpCommandType parse_command_type(const gchar *cmd_str)
     return WCP_CMD_UNKNOWN;
 }
 
-static GArray* parse_id_array(JsonArray *arr)
+static gboolean json_object_require_array(JsonObject *obj,
+                                          const gchar *name,
+                                          JsonArray **out,
+                                          GError **error)
+{
+    if (!json_object_has_member(obj, name)) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Missing required field: %s", name);
+        return FALSE;
+    }
+
+    JsonNode *node = json_object_get_member(obj, name);
+    if (!JSON_NODE_HOLDS_ARRAY(node)) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Field '%s' must be an array", name);
+        return FALSE;
+    }
+
+    *out = json_node_get_array(node);
+    return TRUE;
+}
+
+static gboolean json_object_require_string(JsonObject *obj,
+                                           const gchar *name,
+                                           gchar **out,
+                                           GError **error)
+{
+    if (!json_object_has_member(obj, name)) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Missing required field: %s", name);
+        return FALSE;
+    }
+
+    JsonNode *node = json_object_get_member(obj, name);
+    if (!JSON_NODE_HOLDS_VALUE(node) ||
+        json_node_get_value_type(node) != G_TYPE_STRING) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Field '%s' must be a string", name);
+        return FALSE;
+    }
+
+    *out = g_strdup(json_node_get_string(node));
+    return TRUE;
+}
+
+static gboolean json_object_require_boolean(JsonObject *obj,
+                                            const gchar *name,
+                                            gboolean *out,
+                                            GError **error)
+{
+    if (!json_object_has_member(obj, name)) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Missing required field: %s", name);
+        return FALSE;
+    }
+
+    JsonNode *node = json_object_get_member(obj, name);
+    if (!JSON_NODE_HOLDS_VALUE(node) ||
+        json_node_get_value_type(node) != G_TYPE_BOOLEAN) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Field '%s' must be a boolean", name);
+        return FALSE;
+    }
+
+    *out = json_node_get_boolean(node);
+    return TRUE;
+}
+
+static gboolean json_object_require_int64(JsonObject *obj,
+                                          const gchar *name,
+                                          gint64 *out,
+                                          GError **error)
+{
+    if (!json_object_has_member(obj, name)) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Missing required field: %s", name);
+        return FALSE;
+    }
+
+    JsonNode *node = json_object_get_member(obj, name);
+    if (!JSON_NODE_HOLDS_VALUE(node)) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Field '%s' must be a number", name);
+        return FALSE;
+    }
+
+    GType type = json_node_get_value_type(node);
+    if (type == G_TYPE_INT64) {
+        *out = json_node_get_int(node);
+        return TRUE;
+    }
+    if (type == G_TYPE_DOUBLE) {
+        *out = (gint64)json_node_get_double(node);
+        return TRUE;
+    }
+
+    g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                "Field '%s' must be a number", name);
+    return FALSE;
+}
+
+static gboolean json_object_require_uint(JsonObject *obj,
+                                         const gchar *name,
+                                         guint *out,
+                                         GError **error)
+{
+    gint64 value = 0;
+    if (!json_object_require_int64(obj, name, &value, error)) {
+        return FALSE;
+    }
+    if (value < 0 || value > G_MAXUINT) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Field '%s' must be a non-negative integer", name);
+        return FALSE;
+    }
+    *out = (guint)value;
+    return TRUE;
+}
+
+static GArray* parse_id_array(JsonArray *arr, GError **error)
 {
     GArray *ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
     guint len = json_array_get_length(arr);
     
     for (guint i = 0; i < len; i++) {
+        JsonNode *node = json_array_get_element(arr, i);
+        if (!JSON_NODE_HOLDS_VALUE(node)) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "ids[%u] must be a number", i);
+            g_array_free(ids, TRUE);
+            return NULL;
+        }
+
+        GType type = json_node_get_value_type(node);
+        gint64 value = 0;
+        if (type == G_TYPE_INT64) {
+            value = json_node_get_int(node);
+        } else if (type == G_TYPE_DOUBLE) {
+            value = (gint64)json_node_get_double(node);
+        } else {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "ids[%u] must be a number", i);
+            g_array_free(ids, TRUE);
+            return NULL;
+        }
+
+        if (value < 0) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "ids[%u] must be non-negative", i);
+            g_array_free(ids, TRUE);
+            return NULL;
+        }
+
         WcpDisplayedItemRef ref;
-        ref.id = (guint)json_array_get_int_element(arr, i);
+        ref.id = (guint64)value;
         g_array_append_val(ids, ref);
     }
     
     return ids;
 }
 
-static GPtrArray* parse_string_array(JsonArray *arr)
+static GPtrArray* parse_string_array(JsonArray *arr, GError **error, const gchar *label)
 {
     GPtrArray *strings = g_ptr_array_new_with_free_func(g_free);
     guint len = json_array_get_length(arr);
     
     for (guint i = 0; i < len; i++) {
-        const gchar *str = json_array_get_string_element(arr, i);
-        g_ptr_array_add(strings, g_strdup(str));
+        JsonNode *node = json_array_get_element(arr, i);
+        if (!JSON_NODE_HOLDS_VALUE(node) ||
+            json_node_get_value_type(node) != G_TYPE_STRING) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "%s[%u] must be a string", label ? label : "items", i);
+            g_ptr_array_free(strings, TRUE);
+            return NULL;
+        }
+        g_ptr_array_add(strings, g_strdup(json_node_get_string(node)));
     }
     
     return strings;
 }
 
-static GArray* parse_marker_array(JsonArray *arr)
+static GArray* parse_marker_array(JsonArray *arr, GError **error)
 {
     GArray *markers = g_array_new(FALSE, TRUE, sizeof(WcpMarkerInfo));
     guint len = json_array_get_length(arr);
     
     for (guint i = 0; i < len; i++) {
-        JsonObject *marker_obj = json_array_get_object_element(arr, i);
+        JsonNode *node = json_array_get_element(arr, i);
+        if (!JSON_NODE_HOLDS_OBJECT(node)) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "markers[%u] must be an object", i);
+            g_array_free(markers, TRUE);
+            return NULL;
+        }
+        JsonObject *marker_obj = json_node_get_object(node);
         WcpMarkerInfo marker = {0};
         
-        marker.time = json_object_get_int_member(marker_obj, "time");
-        
-        if (json_object_has_member(marker_obj, "name")) {
-            marker.name = g_strdup(json_object_get_string_member(marker_obj, "name"));
+        if (!json_object_require_int64(marker_obj, "time", &marker.time, error) ||
+            !json_object_require_boolean(marker_obj, "move_focus", &marker.move_focus, error)) {
+            g_array_free(markers, TRUE);
+            return NULL;
         }
         
-        if (json_object_has_member(marker_obj, "move_focus")) {
-            marker.move_focus = json_object_get_boolean_member(marker_obj, "move_focus");
+        if (json_object_has_member(marker_obj, "name")) {
+            JsonNode *name_node = json_object_get_member(marker_obj, "name");
+            if (!JSON_NODE_HOLDS_VALUE(name_node) ||
+                json_node_get_value_type(name_node) != G_TYPE_STRING) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Field 'name' must be a string");
+                g_array_free(markers, TRUE);
+                return NULL;
+            }
+            marker.name = g_strdup(json_node_get_string(name_node));
         }
         
         g_array_append_val(markers, marker);
@@ -168,68 +337,182 @@ WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
     switch (cmd_type) {
         case WCP_CMD_GET_ITEM_INFO:
         case WCP_CMD_REMOVE_ITEMS:
-            if (json_object_has_member(obj, "ids")) {
-                JsonArray *arr = json_object_get_array_member(obj, "ids");
-                cmd->data.item_refs.ids = parse_id_array(arr);
+        {
+            JsonArray *arr = NULL;
+            if (!json_object_require_array(obj, "ids", &arr, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.item_refs.ids = parse_id_array(arr, error);
+            if (!cmd->data.item_refs.ids) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
             }
             break;
-            
+        }
         case WCP_CMD_SET_ITEM_COLOR:
-            cmd->data.set_color.id.id = (guint)json_object_get_int_member(obj, "id");
-            cmd->data.set_color.color = g_strdup(json_object_get_string_member(obj, "color"));
+        {
+            gint64 id_value = 0;
+            if (!json_object_require_int64(obj, "id", &id_value, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            if (id_value < 0) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Field 'id' must be non-negative");
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.set_color.id.id = (guint64)id_value;
+            if (!json_object_require_string(obj, "color", &cmd->data.set_color.color, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
             break;
-            
+        }
         case WCP_CMD_ADD_VARIABLES:
-            if (json_object_has_member(obj, "variables")) {
-                JsonArray *arr = json_object_get_array_member(obj, "variables");
-                cmd->data.add_vars.variables = parse_string_array(arr);
+        {
+            JsonArray *arr = NULL;
+            if (!json_object_require_array(obj, "variables", &arr, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.add_vars.variables = parse_string_array(arr, error, "variables");
+            if (!cmd->data.add_vars.variables) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
             }
             break;
-            
+        }
         case WCP_CMD_ADD_SCOPE:
-            cmd->data.add_scope.scope = g_strdup(json_object_get_string_member(obj, "scope"));
+        {
+            if (!json_object_require_string(obj, "scope", &cmd->data.add_scope.scope, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
             if (json_object_has_member(obj, "recursive")) {
-                cmd->data.add_scope.recursive = json_object_get_boolean_member(obj, "recursive");
+                JsonNode *node = json_object_get_member(obj, "recursive");
+                if (!JSON_NODE_HOLDS_VALUE(node) ||
+                    json_node_get_value_type(node) != G_TYPE_BOOLEAN) {
+                    g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                                "Field 'recursive' must be a boolean");
+                    g_object_unref(parser);
+                    wcp_command_free(cmd);
+                    return NULL;
+                }
+                cmd->data.add_scope.recursive = json_node_get_boolean(node);
             }
             break;
-            
+        }
         case WCP_CMD_ADD_ITEMS:
-            if (json_object_has_member(obj, "items")) {
-                JsonArray *arr = json_object_get_array_member(obj, "items");
-                cmd->data.add_items.items = parse_string_array(arr);
+        {
+            JsonArray *arr = NULL;
+            if (!json_object_require_array(obj, "items", &arr, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.add_items.items = parse_string_array(arr, error, "items");
+            if (!cmd->data.add_items.items) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
             }
             if (json_object_has_member(obj, "recursive")) {
-                cmd->data.add_items.recursive = json_object_get_boolean_member(obj, "recursive");
+                JsonNode *node = json_object_get_member(obj, "recursive");
+                if (!JSON_NODE_HOLDS_VALUE(node) ||
+                    json_node_get_value_type(node) != G_TYPE_BOOLEAN) {
+                    g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                                "Field 'recursive' must be a boolean");
+                    g_object_unref(parser);
+                    wcp_command_free(cmd);
+                    return NULL;
+                }
+                cmd->data.add_items.recursive = json_node_get_boolean(node);
             }
             break;
-            
+        }
         case WCP_CMD_ADD_MARKERS:
-            if (json_object_has_member(obj, "markers")) {
-                JsonArray *arr = json_object_get_array_member(obj, "markers");
-                cmd->data.add_markers.markers = parse_marker_array(arr);
+        {
+            JsonArray *arr = NULL;
+            if (!json_object_require_array(obj, "markers", &arr, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.add_markers.markers = parse_marker_array(arr, error);
+            if (!cmd->data.add_markers.markers) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
             }
             break;
-            
+        }
         case WCP_CMD_SET_VIEWPORT_TO:
-            cmd->data.viewport_to.timestamp = json_object_get_int_member(obj, "timestamp");
+            if (!json_object_require_int64(obj, "timestamp",
+                                           &cmd->data.viewport_to.timestamp, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
             break;
-            
+
         case WCP_CMD_SET_VIEWPORT_RANGE:
-            cmd->data.viewport_range.start = json_object_get_int_member(obj, "start");
-            cmd->data.viewport_range.end = json_object_get_int_member(obj, "end");
+            if (!json_object_require_int64(obj, "start", &cmd->data.viewport_range.start, error) ||
+                !json_object_require_int64(obj, "end", &cmd->data.viewport_range.end, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
             break;
-            
+
         case WCP_CMD_FOCUS_ITEM:
-            cmd->data.focus.id.id = (guint)json_object_get_int_member(obj, "id");
+        {
+            gint64 id_value = 0;
+            if (!json_object_require_int64(obj, "id", &id_value, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            if (id_value < 0) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Field 'id' must be non-negative");
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.focus.id.id = (guint64)id_value;
             break;
-            
+        }
         case WCP_CMD_LOAD:
-            cmd->data.load.source = g_strdup(json_object_get_string_member(obj, "source"));
+            if (!json_object_require_string(obj, "source", &cmd->data.load.source, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
             break;
-            
+
         case WCP_CMD_ZOOM_TO_FIT:
-            if (json_object_has_member(obj, "viewport_idx")) {
-                cmd->data.zoom.viewport_idx = (guint)json_object_get_int_member(obj, "viewport_idx");
+            if (!json_object_has_member(obj, "viewport_idx")) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Missing required field: viewport_idx");
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            if (!json_object_require_uint(obj, "viewport_idx",
+                                          &cmd->data.zoom.viewport_idx, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
             }
             break;
             
@@ -392,7 +675,7 @@ gchar* wcp_create_item_list_response(GArray *ids)
     if (ids) {
         for (guint i = 0; i < ids->len; i++) {
             WcpDisplayedItemRef *ref = &g_array_index(ids, WcpDisplayedItemRef, i);
-            json_builder_add_int_value(builder, ref->id);
+            json_builder_add_int_value(builder, (gint64)ref->id);
         }
     }
     json_builder_end_array(builder);
@@ -436,7 +719,7 @@ gchar* wcp_create_item_info_response(GPtrArray *items)
             json_builder_add_string_value(builder, info->type);
             
             json_builder_set_member_name(builder, "id");
-            json_builder_add_int_value(builder, info->id.id);
+            json_builder_add_int_value(builder, (gint64)info->id.id);
             
             json_builder_end_object(builder);
         }
@@ -473,7 +756,7 @@ gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
     if (ids) {
         for (guint i = 0; i < ids->len; i++) {
             WcpDisplayedItemRef *ref = &g_array_index(ids, WcpDisplayedItemRef, i);
-            json_builder_add_int_value(builder, ref->id);
+            json_builder_add_int_value(builder, (gint64)ref->id);
         }
     }
     json_builder_end_array(builder);
@@ -554,5 +837,61 @@ gchar* wcp_create_goto_declaration_event(const gchar *variable)
     g_object_unref(gen);
     g_object_unref(builder);
     
+    return json_str;
+}
+
+gchar* wcp_create_add_drivers_event(const gchar *variable)
+{
+    JsonBuilder *builder = json_builder_new();
+
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "type");
+    json_builder_add_string_value(builder, "event");
+
+    json_builder_set_member_name(builder, "event");
+    json_builder_add_string_value(builder, "add_drivers");
+
+    json_builder_set_member_name(builder, "variable");
+    json_builder_add_string_value(builder, variable);
+
+    json_builder_end_object(builder);
+
+    JsonNode *root = json_builder_get_root(builder);
+    JsonGenerator *gen = json_generator_new();
+    json_generator_set_root(gen, root);
+    gchar *json_str = json_generator_to_data(gen, NULL);
+
+    json_node_free(root);
+    g_object_unref(gen);
+    g_object_unref(builder);
+
+    return json_str;
+}
+
+gchar* wcp_create_add_loads_event(const gchar *variable)
+{
+    JsonBuilder *builder = json_builder_new();
+
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "type");
+    json_builder_add_string_value(builder, "event");
+
+    json_builder_set_member_name(builder, "event");
+    json_builder_add_string_value(builder, "add_loads");
+
+    json_builder_set_member_name(builder, "variable");
+    json_builder_add_string_value(builder, variable);
+
+    json_builder_end_object(builder);
+
+    JsonNode *root = json_builder_get_root(builder);
+    JsonGenerator *gen = json_generator_new();
+    json_generator_set_root(gen, root);
+    gchar *json_str = json_generator_to_data(gen, NULL);
+
+    json_node_free(root);
+    g_object_unref(gen);
+    g_object_unref(builder);
+
     return json_str;
 }
