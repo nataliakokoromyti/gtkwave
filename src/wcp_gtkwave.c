@@ -946,10 +946,3 @@ void wcp_gtkwave_notify_waveforms_loaded(const gchar *filename)
         wcp_server_emit_waveforms_loaded(g_wcp_server, filename);
     }
 }
-
-void wcp_gtkwave_notify_goto_declaration(const gchar *variable)
-{
-    if (g_wcp_server) {
-        wcp_server_emit_goto_declaration(g_wcp_server, variable);
-    }
-}

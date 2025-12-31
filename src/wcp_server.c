@@ -285,14 +285,6 @@ void wcp_server_emit_waveforms_loaded(WcpServer *server, const gchar *source)
     wcp_server_send(server, event);
 }
 
-void wcp_server_emit_goto_declaration(WcpServer *server, const gchar *variable)
-{
-    if (!server->client_connected) return;
-    
-    gchar *event = wcp_create_goto_declaration_event(variable);
-    wcp_server_send(server, event);
-}
-
 gboolean wcp_server_initiate(WcpServer *server,
                              const gchar *host,
                              guint16 port,

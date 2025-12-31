@@ -763,21 +763,3 @@ gchar* wcp_create_waveforms_loaded_event(const gchar *source)
     return wcp_json_builder_to_string(builder);
 }
 
-gchar* wcp_create_goto_declaration_event(const gchar *variable)
-{
-    JsonBuilder *builder = json_builder_new();
-    
-    json_builder_begin_object(builder);
-    json_builder_set_member_name(builder, "type");
-    json_builder_add_string_value(builder, "event");
-    
-    json_builder_set_member_name(builder, "event");
-    json_builder_add_string_value(builder, "goto_declaration");
-    
-    json_builder_set_member_name(builder, "variable");
-    json_builder_add_string_value(builder, variable);
-    
-    json_builder_end_object(builder);
-    
-    return wcp_json_builder_to_string(builder);
-}

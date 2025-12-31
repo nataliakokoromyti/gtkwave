@@ -54,10 +54,4 @@ void wcp_gtkwave_shutdown(void);
  */
 void wcp_gtkwave_notify_waveforms_loaded(const gchar *filename);
 
-/**
- * Notify WCP client of goto-declaration request
- * Call this when user requests to jump to source
- */
-void wcp_gtkwave_notify_goto_declaration(const gchar *variable);
-
 #endif /* WCP_GTKWAVE_H */

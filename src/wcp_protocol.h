@@ -164,7 +164,6 @@ gchar* wcp_create_add_items_response(GArray *ids);
 
 /* Create JSON event messages */
 gchar* wcp_create_waveforms_loaded_event(const gchar *source);
-gchar* wcp_create_goto_declaration_event(const gchar *variable);
 
 /* List of supported commands (for greeting) */
 const gchar** wcp_get_supported_commands(void);
