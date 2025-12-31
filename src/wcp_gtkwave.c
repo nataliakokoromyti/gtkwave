@@ -807,10 +807,13 @@ static gchar* handle_reload(WcpServer *server, WcpCommand *cmd)
 static gchar* handle_zoom_to_fit(WcpServer *server, WcpCommand *cmd)
 {
     (void)server;
-    (void)cmd;
 
     if (!wcp_has_dump_file()) {
         return wcp_create_error("no_waveform", "No waveform loaded", NULL);
+    }
+
+    if (cmd->data.zoom.viewport_idx != 0) {
+        return wcp_create_error("invalid_argument", "Unsupported viewport index", NULL);
     }
 
     service_zoom_fit(NULL, NULL);
