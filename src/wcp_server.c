@@ -12,10 +12,6 @@
 #define WCP_DEFAULT_PORT 8765
 #endif
 
-/* ============================================================================
- * Internal Functions
- * ============================================================================ */
-
 static void handle_line(WcpServer *server, const gchar *line)
 {
     GError *error = NULL;
@@ -146,10 +142,6 @@ static gboolean on_incoming_connection(GSocketService *service,
     
     return TRUE;
 }
-
-/* ============================================================================
- * Public API
- * ============================================================================ */
 
 WcpServer* wcp_server_new(guint16 port, 
                           WcpCommandHandler handler,

@@ -63,7 +63,7 @@ typedef struct {
 /* Information about an item */
 typedef struct {
     gchar *name;
-    gchar *type;  /* "signal", "marker", "divider", etc. */
+    gchar *type;  /* "signal", "marker" */
     WcpDisplayedItemRef id;
 } WcpItemInfo;
 
