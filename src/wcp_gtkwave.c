@@ -580,6 +580,49 @@ static gchar* handle_add_markers(WcpServer *server, WcpCommand *cmd)
     return response;
 }
 
+static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
+{
+    (void)server;
+
+    if (!wcp_has_dump_file()) {
+        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
+    }
+
+    GArray *added_ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
+    if (cmd->data.add_items.items) {
+        GHashTable *added_vec_roots = g_hash_table_new(g_direct_hash, g_direct_equal);
+
+        for (guint i = 0; i < cmd->data.add_items.items->len; i++) {
+            const gchar *item = g_ptr_array_index(cmd->data.add_items.items, i);
+            GwSymbol *sym = gw_dump_file_lookup_symbol(GLOBALS->dump_file, item);
+            if (sym) {
+                wcp_add_symbol(sym, added_vec_roots, added_ids);
+                continue;
+            }
+
+            GwTreeNode *scope = wcp_find_scope_node(item);
+            if (scope) {
+                GPtrArray *symbols = g_ptr_array_new();
+                wcp_collect_scope_symbols(scope->child, cmd->data.add_items.recursive, symbols);
+                for (guint j = 0; j < symbols->len; j++) {
+                    wcp_add_symbol(g_ptr_array_index(symbols, j), added_vec_roots, added_ids);
+                }
+                g_ptr_array_free(symbols, TRUE);
+            }
+        }
+
+        g_hash_table_destroy(added_vec_roots);
+    }
+
+    GLOBALS->signalwindow_width_dirty = 1;
+    MaxSignalLength();
+    redraw_signals_and_waves();
+
+    gchar *response = wcp_create_add_items_response_for("add_items", added_ids);
+    g_array_free(added_ids, TRUE);
+    return response;
+}
+
 static gchar* handle_set_viewport_to(WcpServer *server, WcpCommand *cmd)
 {
     (void)server;
@@ -810,45 +853,7 @@ static gchar* wcp_command_handler(WcpServer *server, WcpCommand *cmd, gpointer u
             return handle_add_scope(server, cmd);
             
         case WCP_CMD_ADD_ITEMS:
-        {
-            if (!wcp_has_dump_file()) {
-                return wcp_create_error("no_waveform", "No waveform loaded", NULL);
-            }
-
-            GArray *added_ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
-            if (cmd->data.add_items.items) {
-                GHashTable *added_vec_roots = g_hash_table_new(g_direct_hash, g_direct_equal);
-
-                for (guint i = 0; i < cmd->data.add_items.items->len; i++) {
-                    const gchar *item = g_ptr_array_index(cmd->data.add_items.items, i);
-                    GwSymbol *sym = gw_dump_file_lookup_symbol(GLOBALS->dump_file, item);
-                    if (sym) {
-                        wcp_add_symbol(sym, added_vec_roots, added_ids);
-                        continue;
-                    }
-
-                    GwTreeNode *scope = wcp_find_scope_node(item);
-                    if (scope) {
-                        GPtrArray *symbols = g_ptr_array_new();
-                        wcp_collect_scope_symbols(scope->child, cmd->data.add_items.recursive, symbols);
-                        for (guint j = 0; j < symbols->len; j++) {
-                            wcp_add_symbol(g_ptr_array_index(symbols, j), added_vec_roots, added_ids);
-                        }
-                        g_ptr_array_free(symbols, TRUE);
-                    }
-                }
-
-                g_hash_table_destroy(added_vec_roots);
-            }
-
-            GLOBALS->signalwindow_width_dirty = 1;
-            MaxSignalLength();
-            redraw_signals_and_waves();
-
-            gchar *response = wcp_create_add_items_response_for("add_items", added_ids);
-            g_array_free(added_ids, TRUE);
-            return response;
-        }
+            return handle_add_items(server, cmd);
             
         case WCP_CMD_ADD_MARKERS:
             return handle_add_markers(server, cmd);
