@@ -199,29 +199,25 @@ static gint wcp_parse_color(const gchar *color)
         }
     }
 
-    if (!g_ascii_strcasecmp(color, "normal") || !g_ascii_strcasecmp(color, "default")) {
-        return WAVE_COLOR_NORMAL;
-    }
-    if (!g_ascii_strcasecmp(color, "red")) {
-        return WAVE_COLOR_RED;
-    }
-    if (!g_ascii_strcasecmp(color, "orange")) {
-        return WAVE_COLOR_ORANGE;
-    }
-    if (!g_ascii_strcasecmp(color, "yellow")) {
-        return WAVE_COLOR_YELLOW;
-    }
-    if (!g_ascii_strcasecmp(color, "green")) {
-        return WAVE_COLOR_GREEN;
-    }
-    if (!g_ascii_strcasecmp(color, "blue")) {
-        return WAVE_COLOR_BLUE;
-    }
-    if (!g_ascii_strcasecmp(color, "indigo")) {
-        return WAVE_COLOR_INDIGO;
-    }
-    if (!g_ascii_strcasecmp(color, "violet")) {
-        return WAVE_COLOR_VIOLET;
+    static const struct {
+        const gchar *name;
+        gint value;
+    } color_map[] = {
+        {"normal", WAVE_COLOR_NORMAL},
+        {"default", WAVE_COLOR_NORMAL},
+        {"red", WAVE_COLOR_RED},
+        {"orange", WAVE_COLOR_ORANGE},
+        {"yellow", WAVE_COLOR_YELLOW},
+        {"green", WAVE_COLOR_GREEN},
+        {"blue", WAVE_COLOR_BLUE},
+        {"indigo", WAVE_COLOR_INDIGO},
+        {"violet", WAVE_COLOR_VIOLET},
+    };
+
+    for (guint i = 0; i < G_N_ELEMENTS(color_map); i++) {
+        if (!g_ascii_strcasecmp(color, color_map[i].name)) {
+            return color_map[i].value;
+        }
     }
 
     return -1;
