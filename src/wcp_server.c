@@ -154,8 +154,6 @@ WcpServer* wcp_server_new(guint16 port,
     server->handler_data = user_data;
     server->running = FALSE;
     server->client_connected = FALSE;
-    server->context = g_main_context_default();
-    
     return server;
 }
 

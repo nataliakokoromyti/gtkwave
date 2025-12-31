@@ -33,8 +33,6 @@ struct _WcpServer {
     WcpCommandHandler handler;
     gpointer handler_data;
     
-    /* For GTK main loop integration */
-    GMainContext *context;
 };
 
 /* ============================================================================
@@ -72,16 +70,6 @@ void wcp_server_stop(WcpServer *server);
  */
 void wcp_server_free(WcpServer *server);
 
-/**
- * Get the port the server is listening on
- * @param server The server instance
- * @return Port number
- */
-/**
- * Check if a client is connected
- * @param server The server instance
- * @return TRUE if client is connected
- */
 /* ============================================================================
  * Message Sending (Server -> Client)
  * ============================================================================ */
@@ -95,10 +83,9 @@ void wcp_server_free(WcpServer *server);
 gboolean wcp_server_send(WcpServer *server, gchar *message);
 
 /**
- * Send an event to the connected client
+ * Send a waveforms_loaded event to the connected client
  * @param server The server instance
- * @param event_type Event type
- * @param ... Event-specific parameters
+ * @param source Source filename
  */
 void wcp_server_emit_waveforms_loaded(WcpServer *server, const gchar *source);
 
