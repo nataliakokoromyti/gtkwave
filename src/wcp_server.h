@@ -1,0 +1,127 @@
+/*
+ * WCP Server for GTKWave
+ * 
+ * TCP server that listens for WCP client connections and dispatches
+ * commands to GTKWave.
+ */
+
+#ifndef WCP_SERVER_H
+#define WCP_SERVER_H
+
+#include <glib.h>
+#include <gio/gio.h>
+#include "wcp_protocol.h"
+
+/* Forward declaration */
+typedef struct _WcpServer WcpServer;
+
+/* Callback for command execution - implemented by GTKWave integration */
+typedef gchar* (*WcpCommandHandler)(WcpServer *server, WcpCommand *cmd, gpointer user_data);
+
+/* Server state */
+struct _WcpServer {
+    GSocketService *service;
+    GSocketConnection *client_connection;
+    GOutputStream *output_stream;
+    GInputStream *input_stream;
+    GDataInputStream *data_input;
+    
+    guint16 port;
+    gboolean running;
+    gboolean client_connected;
+    
+    WcpCommandHandler handler;
+    gpointer handler_data;
+    
+    /* For GTK main loop integration */
+    GMainContext *context;
+};
+
+/* ============================================================================
+ * Server Lifecycle
+ * ============================================================================ */
+
+/**
+ * Create a new WCP server
+ * @param port Port to listen on (0 for auto-assign)
+ * @param handler Callback function to handle commands
+ * @param user_data User data passed to handler
+ * @return New WCP server instance, or NULL on error
+ */
+WcpServer* wcp_server_new(guint16 port, 
+                          WcpCommandHandler handler,
+                          gpointer user_data);
+
+/**
+ * Start the WCP server (begins listening)
+ * @param server The server instance
+ * @param error Location for error, or NULL
+ * @return TRUE on success
+ */
+gboolean wcp_server_start(WcpServer *server, GError **error);
+
+/**
+ * Stop the WCP server
+ * @param server The server instance
+ */
+void wcp_server_stop(WcpServer *server);
+
+/**
+ * Free the WCP server
+ * @param server The server instance
+ */
+void wcp_server_free(WcpServer *server);
+
+/**
+ * Get the port the server is listening on
+ * @param server The server instance
+ * @return Port number
+ */
+guint16 wcp_server_get_port(WcpServer *server);
+
+/**
+ * Check if a client is connected
+ * @param server The server instance
+ * @return TRUE if client is connected
+ */
+gboolean wcp_server_has_client(WcpServer *server);
+
+/* ============================================================================
+ * Message Sending (Server -> Client)
+ * ============================================================================ */
+
+/**
+ * Send a message to the connected client
+ * @param server The server instance
+ * @param message JSON message string (will be freed)
+ * @return TRUE on success
+ */
+gboolean wcp_server_send(WcpServer *server, gchar *message);
+
+/**
+ * Send an event to the connected client
+ * @param server The server instance
+ * @param event_type Event type
+ * @param ... Event-specific parameters
+ */
+void wcp_server_emit_waveforms_loaded(WcpServer *server, const gchar *source);
+void wcp_server_emit_goto_declaration(WcpServer *server, const gchar *variable);
+
+/* ============================================================================
+ * Initiating Connection (for --wcp-initiate mode)
+ * ============================================================================ */
+
+/**
+ * Connect to a WCP client (instead of listening)
+ * @param server The server instance
+ * @param host Host to connect to
+ * @param port Port to connect to
+ * @param error Location for error, or NULL
+ * @return TRUE on success
+ */
+gboolean wcp_server_initiate(WcpServer *server,
+                             const gchar *host,
+                             guint16 port,
+                             GError **error);
+
+#endif /* WCP_SERVER_H */
