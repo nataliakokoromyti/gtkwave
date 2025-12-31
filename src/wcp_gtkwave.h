@@ -4,17 +4,13 @@
  * This module bridges WCP commands to GTKWave's internal functions.
  * It translates WCP protocol messages into GTKWave API calls.
  * 
- * NOTE: This file requires access to GTKWave internals (globals.h, etc.)
- * and should be placed in src/ of the GTKWave source tree.
+ *
  */
 
 #ifndef WCP_GTKWAVE_H
 #define WCP_GTKWAVE_H
 
 #include "wcp_server.h"
-
-/* Global WCP server instance */
-extern WcpServer *g_wcp_server;
 
 /* ============================================================================
  * Initialization
