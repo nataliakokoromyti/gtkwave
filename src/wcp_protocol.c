@@ -9,7 +9,6 @@
 
 /* Supported commands for greeting */
 static const gchar *supported_commands[] = {
-    "get_item_list",
     "add_items",
     "set_viewport_range",
     "load",
@@ -35,7 +34,6 @@ static WcpCommandType parse_command_type(const gchar *cmd_str)
 {
     if (!cmd_str) return WCP_CMD_UNKNOWN;
     
-    if (g_str_equal(cmd_str, "get_item_list"))      return WCP_CMD_GET_ITEM_LIST;
     if (g_str_equal(cmd_str, "add_items"))          return WCP_CMD_ADD_ITEMS;
     if (g_str_equal(cmd_str, "set_viewport_range")) return WCP_CMD_SET_VIEWPORT_RANGE;
     if (g_str_equal(cmd_str, "load"))               return WCP_CMD_LOAD;
@@ -320,32 +318,6 @@ gchar* wcp_create_error(const gchar *error_type,
     if (arguments) {
         for (guint i = 0; i < arguments->len; i++) {
             json_builder_add_string_value(builder, g_ptr_array_index(arguments, i));
-        }
-    }
-    json_builder_end_array(builder);
-    
-    json_builder_end_object(builder);
-    
-    return wcp_json_builder_to_string(builder);
-}
-
-gchar* wcp_create_item_list_response(GArray *ids)
-{
-    JsonBuilder *builder = json_builder_new();
-    
-    json_builder_begin_object(builder);
-    json_builder_set_member_name(builder, "type");
-    json_builder_add_string_value(builder, "response");
-    
-    json_builder_set_member_name(builder, "command");
-    json_builder_add_string_value(builder, "get_item_list");
-    
-    json_builder_set_member_name(builder, "ids");
-    json_builder_begin_array(builder);
-    if (ids) {
-        for (guint i = 0; i < ids->len; i++) {
-            WcpDisplayedItemRef *ref = &g_array_index(ids, WcpDisplayedItemRef, i);
-            json_builder_add_int_value(builder, (gint64)ref->id);
         }
     }
     json_builder_end_array(builder);

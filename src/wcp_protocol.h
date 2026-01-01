@@ -24,9 +24,6 @@
 typedef enum {
     WCP_CMD_UNKNOWN = 0,
     
-    /* Query commands */
-    WCP_CMD_GET_ITEM_LIST,      /* Get list of displayed items */
-
     /* Modification commands */
     WCP_CMD_ADD_ITEMS,          /* Add variables or scopes */
 
@@ -44,7 +41,7 @@ typedef enum {
  * Data Structures
  * ============================================================================ */
 
-/* Reference to a displayed item (signal, marker, etc.) */
+/* Reference to a displayed item */
 typedef struct {
     guint64 id;
 } WcpDisplayedItemRef;
@@ -90,7 +87,6 @@ gchar* wcp_create_ack(void);
 gchar* wcp_create_error(const gchar *error_type, 
                         const gchar *message,
                         GPtrArray *arguments);
-gchar* wcp_create_item_list_response(GArray *ids);
 gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids);
 
 #endif /* WCP_PROTOCOL_H */

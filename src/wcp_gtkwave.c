@@ -18,128 +18,13 @@
 /* Global WCP server instance */
 WcpServer *g_wcp_server = NULL;
 
-static GHashTable *wcp_trace_to_id = NULL;
-static GHashTable *wcp_id_to_trace = NULL;
-static guint64 wcp_next_trace_id = 1;
-
-static guint64 *wcp_id_new(guint64 id)
-{
-    guint64 *value = g_new(guint64, 1);
-    *value = id;
-    return value;
-}
-
-static void wcp_trace_map_init(void)
-{
-    if (wcp_trace_to_id) {
-        return;
-    }
-    wcp_trace_to_id = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_free);
-    wcp_id_to_trace = g_hash_table_new_full(g_int64_hash, g_int64_equal, g_free, NULL);
-}
-
-static void wcp_trace_map_free(void)
-{
-    if (wcp_trace_to_id) {
-        g_hash_table_destroy(wcp_trace_to_id);
-        wcp_trace_to_id = NULL;
-    }
-    if (wcp_id_to_trace) {
-        g_hash_table_destroy(wcp_id_to_trace);
-        wcp_id_to_trace = NULL;
-    }
-}
-
-static gboolean wcp_trace_is_live(GwTrace *t)
-{
-    for (GwTrace *cur = GLOBALS->traces.first; cur; cur = cur->t_next) {
-        if (cur == t) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
-static void wcp_trace_map_prune(void)
-{
-    if (!wcp_trace_to_id) {
-        return;
-    }
-
-    GHashTable *live = g_hash_table_new(g_direct_hash, g_direct_equal);
-    for (GwTrace *t = GLOBALS->traces.first; t; t = t->t_next) {
-        g_hash_table_add(live, t);
-    }
-
-    GHashTableIter iter;
-    gpointer key;
-    gpointer value;
-    g_hash_table_iter_init(&iter, wcp_trace_to_id);
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        if (!g_hash_table_contains(live, key)) {
-            guint64 id = *(guint64 *)value;
-            g_hash_table_remove(wcp_id_to_trace, &id);
-            g_hash_table_iter_remove(&iter);
-        }
-    }
-
-    g_hash_table_destroy(live);
-}
-
-static guint64 wcp_get_trace_id(GwTrace *t)
-{
-    wcp_trace_map_init();
-
-    guint64 *existing = g_hash_table_lookup(wcp_trace_to_id, t);
-    if (existing) {
-        return *existing;
-    }
-
-    guint64 id = wcp_next_trace_id++;
-    g_hash_table_insert(wcp_trace_to_id, t, wcp_id_new(id));
-    g_hash_table_insert(wcp_id_to_trace, wcp_id_new(id), t);
-    return id;
-}
-
-static void wcp_remove_trace_id(GwTrace *t)
-{
-    if (!wcp_trace_to_id) {
-        return;
-    }
-    guint64 *id_ptr = g_hash_table_lookup(wcp_trace_to_id, t);
-    if (id_ptr) {
-        guint64 id = *id_ptr;
-        g_hash_table_remove(wcp_trace_to_id, t);
-        g_hash_table_remove(wcp_id_to_trace, &id);
-    }
-}
-
-static GwTrace *wcp_lookup_trace(guint64 id)
-{
-    if (!wcp_id_to_trace) {
-        return NULL;
-    }
-    gint64 key = (gint64)id;
-    GwTrace *t = g_hash_table_lookup(wcp_id_to_trace, &key);
-    if (!t) {
-        return NULL;
-    }
-    if (!wcp_trace_is_live(t)) {
-        wcp_remove_trace_id(t);
-        return NULL;
-    }
-    return t;
-}
-
 static gboolean wcp_has_dump_file(void)
 {
     return GLOBALS->dump_file != NULL && GLOBALS->loaded_file_type != MISSING_FILE;
 }
 
-static gboolean wcp_add_symbol(GwSymbol *sym, GHashTable *added_vec_roots, GArray *added_ids)
+static gboolean wcp_add_symbol(GwSymbol *sym, GHashTable *added_vec_roots)
 {
-    GwTrace *added_trace = NULL;
-
     if (sym->vec_root && GLOBALS->autocoalesce) {
         GwSymbol *root = sym->vec_root;
         if (g_hash_table_contains(added_vec_roots, root)) {
@@ -161,20 +46,14 @@ static gboolean wcp_add_symbol(GwSymbol *sym, GHashTable *added_vec_roots, GArra
                 lx2_import_masked();
             }
             add_vector_chain(root, len);
-            added_trace = GLOBALS->traces.last;
+            return TRUE;
         }
     } else {
         if (GLOBALS->is_lx2 && sym->n && sym->n->mv.mvlfac) {
             lx2_set_fac_process_mask(sym->n);
             lx2_import_masked();
         }
-        AddNodeTraceReturn(sym->n, NULL, &added_trace);
-    }
-
-    if (added_trace && added_ids) {
-        WcpDisplayedItemRef ref;
-        ref.id = wcp_get_trace_id(added_trace);
-        g_array_append_val(added_ids, ref);
+        AddNodeTraceReturn(sym->n, NULL, NULL);
         return TRUE;
     }
 
@@ -248,32 +127,6 @@ static void wcp_collect_scope_symbols(GwTreeNode *node,
     }
 }
 
-/* ============================================================================
- * Command Handlers
- * 
- * Each handler maps a WCP command to GTKWave functionality.
- * Returns a JSON response string (caller frees).
- * ============================================================================ */
-
-static gchar* handle_get_item_list(WcpServer *server, WcpCommand *cmd)
-{
-    (void)server;
-    (void)cmd;
-    
-    GArray *ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
-    
-    wcp_trace_map_prune();
-    for (GwTrace *t = GLOBALS->traces.first; t; t = t->t_next) {
-        WcpDisplayedItemRef ref;
-        ref.id = wcp_get_trace_id(t);
-        g_array_append_val(ids, ref);
-    }
-
-    gchar *response = wcp_create_item_list_response(ids);
-    g_array_free(ids, TRUE);
-    return response;
-}
-
 static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
 {
     (void)server;
@@ -282,7 +135,6 @@ static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
         return wcp_create_error("no_waveform", "No waveform loaded", NULL);
     }
 
-    GArray *added_ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
     if (cmd->data.add_items.items) {
         GHashTable *added_vec_roots = g_hash_table_new(g_direct_hash, g_direct_equal);
 
@@ -290,7 +142,7 @@ static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
             const gchar *item = g_ptr_array_index(cmd->data.add_items.items, i);
             GwSymbol *sym = gw_dump_file_lookup_symbol(GLOBALS->dump_file, item);
             if (sym) {
-                wcp_add_symbol(sym, added_vec_roots, added_ids);
+                wcp_add_symbol(sym, added_vec_roots);
                 continue;
             }
 
@@ -299,7 +151,7 @@ static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
                 GPtrArray *symbols = g_ptr_array_new();
                 wcp_collect_scope_symbols(scope->child, cmd->data.add_items.recursive, symbols);
                 for (guint j = 0; j < symbols->len; j++) {
-                    wcp_add_symbol(g_ptr_array_index(symbols, j), added_vec_roots, added_ids);
+                    wcp_add_symbol(g_ptr_array_index(symbols, j), added_vec_roots);
                 }
                 g_ptr_array_free(symbols, TRUE);
             }
@@ -312,9 +164,7 @@ static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
     MaxSignalLength();
     redraw_signals_and_waves();
 
-    gchar *response = wcp_create_add_items_response_for("add_items", added_ids);
-    g_array_free(added_ids, TRUE);
-    return response;
+    return wcp_create_add_items_response_for("add_items", NULL);
 }
 
 static gchar* handle_set_viewport_range(WcpServer *server, WcpCommand *cmd)
@@ -374,9 +224,6 @@ static gchar* wcp_command_handler(WcpServer *server, WcpCommand *cmd, gpointer u
     (void)user_data;
     
     switch (cmd->type) {
-        case WCP_CMD_GET_ITEM_LIST:
-            return handle_get_item_list(server, cmd);
-            
         case WCP_CMD_ADD_ITEMS:
             return handle_add_items(server, cmd);
             
@@ -448,6 +295,5 @@ void wcp_gtkwave_shutdown(void)
         wcp_server_free(g_wcp_server);
         g_wcp_server = NULL;
     }
-    wcp_trace_map_free();
 }
 
