@@ -95,10 +95,6 @@ static guint64 wcp_get_trace_id(GwTrace *t)
         return *existing;
     }
 
-    while ((wcp_next_trace_id & WCP_ITEM_MARKER_FLAG) != 0) {
-        wcp_next_trace_id++;
-    }
-
     guint64 id = wcp_next_trace_id++;
     g_hash_table_insert(wcp_trace_to_id, t, wcp_id_new(id));
     g_hash_table_insert(wcp_id_to_trace, wcp_id_new(id), t);
