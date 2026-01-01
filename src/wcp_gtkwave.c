@@ -164,7 +164,7 @@ static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
     MaxSignalLength();
     redraw_signals_and_waves();
 
-    return wcp_create_add_items_response_for("add_items");
+    return wcp_create_ack();
 }
 
 static gchar* handle_set_viewport_range(WcpServer *server, WcpCommand *cmd)

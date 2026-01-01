@@ -82,6 +82,5 @@ gchar* wcp_create_ack(void);
 gchar* wcp_create_error(const gchar *error_type, 
                         const gchar *message,
                         GPtrArray *arguments);
-gchar* wcp_create_add_items_response_for(const gchar *command);
 
 #endif /* WCP_PROTOCOL_H */

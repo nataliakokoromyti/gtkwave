@@ -327,23 +327,3 @@ gchar* wcp_create_error(const gchar *error_type,
     return wcp_json_builder_to_string(builder);
 }
 
-gchar* wcp_create_add_items_response_for(const gchar *command)
-{
-    JsonBuilder *builder = json_builder_new();
-    
-    json_builder_begin_object(builder);
-    json_builder_set_member_name(builder, "type");
-    json_builder_add_string_value(builder, "response");
-    
-    json_builder_set_member_name(builder, "command");
-    json_builder_add_string_value(builder, command ? command : "add_items");
-    
-    json_builder_set_member_name(builder, "ids");
-    json_builder_begin_array(builder);
-    json_builder_end_array(builder);
-    
-    json_builder_end_object(builder);
-    
-    return wcp_json_builder_to_string(builder);
-}
-
