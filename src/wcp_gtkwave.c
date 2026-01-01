@@ -132,7 +132,7 @@ static gchar* handle_add_items(WcpServer *server, WcpCommand *cmd)
     (void)server;
 
     if (!wcp_has_dump_file()) {
-        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
+        return wcp_create_error("no_waveform", "No waveform loaded");
     }
 
     if (cmd->data.add_items.items) {
@@ -172,7 +172,7 @@ static gchar* handle_set_viewport_range(WcpServer *server, WcpCommand *cmd)
     (void)server;
 
     if (!wcp_has_dump_file()) {
-        return wcp_create_error("no_waveform", "No waveform loaded", NULL);
+        return wcp_create_error("no_waveform", "No waveform loaded");
     }
 
     GwTime start = (GwTime)cmd->data.viewport_range.start;
@@ -195,11 +195,11 @@ static gchar* handle_load(WcpServer *server, WcpCommand *cmd)
     const gchar *filename = cmd->data.load.source;
     
     if (!filename || !*filename) {
-        return wcp_create_error("invalid_argument", "Missing source", NULL);
+        return wcp_create_error("invalid_argument", "Missing source");
     }
 
     if (!deal_with_rpc_open(filename, NULL)) {
-        return wcp_create_error("load_failed", "Failed to queue file load", NULL);
+        return wcp_create_error("load_failed", "Failed to queue file load");
     }
     
     return wcp_create_ack();
@@ -237,9 +237,8 @@ static gchar* wcp_command_handler(WcpServer *server, WcpCommand *cmd, gpointer u
             return handle_shutdown(server, cmd);
             
         default:
-            return wcp_create_error("unknown_command", 
-                                    "Unknown command type",
-                                    NULL);
+            return wcp_create_error("unknown_command",
+                                    "Unknown command type");
     }
 }
 

@@ -80,7 +80,6 @@ void wcp_command_free(WcpCommand *cmd);
 gchar* wcp_create_greeting(void);
 gchar* wcp_create_ack(void);
 gchar* wcp_create_error(const gchar *error_type, 
-                        const gchar *message,
-                        GPtrArray *arguments);
+                        const gchar *message);
 
 #endif /* WCP_PROTOCOL_H */

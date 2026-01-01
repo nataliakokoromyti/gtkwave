@@ -298,8 +298,7 @@ gchar* wcp_create_ack(void)
 }
 
 gchar* wcp_create_error(const gchar *error_type, 
-                        const gchar *message,
-                        GPtrArray *arguments)
+                        const gchar *message)
 {
     JsonBuilder *builder = json_builder_new();
     
@@ -312,15 +311,6 @@ gchar* wcp_create_error(const gchar *error_type,
     
     json_builder_set_member_name(builder, "message");
     json_builder_add_string_value(builder, message);
-    
-    json_builder_set_member_name(builder, "arguments");
-    json_builder_begin_array(builder);
-    if (arguments) {
-        for (guint i = 0; i < arguments->len; i++) {
-            json_builder_add_string_value(builder, g_ptr_array_index(arguments, i));
-        }
-    }
-    json_builder_end_array(builder);
     
     json_builder_end_object(builder);
     

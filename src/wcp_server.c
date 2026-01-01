@@ -25,7 +25,7 @@ static void handle_line(WcpServer *server, const gchar *line)
     WcpCommand *cmd = wcp_parse_command(line, &error);
     if (!cmd) {
         g_warning("WCP: Failed to parse command: %s", error->message);
-        gchar *err_response = wcp_create_error("parse_error", error->message, NULL);
+        gchar *err_response = wcp_create_error("parse_error", error->message);
         wcp_server_send(server, err_response);
         g_error_free(error);
         return;
