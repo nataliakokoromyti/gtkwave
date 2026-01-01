@@ -25,7 +25,7 @@ static void handle_line(WcpServer *server, const gchar *line)
     WcpCommand *cmd = wcp_parse_command(line, &error);
     if (!cmd) {
         g_warning("WCP: Failed to parse command: %s", error->message);
-        gchar *err_response = wcp_create_error("parse_error", error->message);
+        gchar *err_response = wcp_create_error("parse_error", error->message, NULL);
         wcp_server_send(server, err_response);
         g_error_free(error);
         return;
@@ -255,6 +255,14 @@ gboolean wcp_server_send(WcpServer *server, gchar *message)
     
     g_free(msg_with_newline);
     return success;
+}
+
+void wcp_server_emit_waveforms_loaded(WcpServer *server, const gchar *source)
+{
+    if (!server->client_connected) return;
+    
+    gchar *event = wcp_create_waveforms_loaded_event(source);
+    wcp_server_send(server, event);
 }
 
 gboolean wcp_server_initiate(WcpServer *server,

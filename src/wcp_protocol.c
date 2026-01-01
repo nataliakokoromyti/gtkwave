@@ -9,9 +9,21 @@
 
 /* Supported commands for greeting */
 static const gchar *supported_commands[] = {
+    "get_item_list",
+    "get_item_info",
+    "set_item_color",
+    "add_variables",
+    "add_scope",
     "add_items",
+    "add_markers",
+    "remove_items",
+    "focus_item",
+    "clear",
+    "set_viewport_to",
     "set_viewport_range",
+    "zoom_to_fit",
     "load",
+    "reload",
     "shutdown",
     NULL
 };
@@ -34,9 +46,21 @@ static WcpCommandType parse_command_type(const gchar *cmd_str)
 {
     if (!cmd_str) return WCP_CMD_UNKNOWN;
     
+    if (g_str_equal(cmd_str, "get_item_list"))      return WCP_CMD_GET_ITEM_LIST;
+    if (g_str_equal(cmd_str, "get_item_info"))      return WCP_CMD_GET_ITEM_INFO;
+    if (g_str_equal(cmd_str, "set_item_color"))     return WCP_CMD_SET_ITEM_COLOR;
+    if (g_str_equal(cmd_str, "add_variables"))      return WCP_CMD_ADD_VARIABLES;
+    if (g_str_equal(cmd_str, "add_scope"))          return WCP_CMD_ADD_SCOPE;
     if (g_str_equal(cmd_str, "add_items"))          return WCP_CMD_ADD_ITEMS;
+    if (g_str_equal(cmd_str, "add_markers"))        return WCP_CMD_ADD_MARKERS;
+    if (g_str_equal(cmd_str, "remove_items"))       return WCP_CMD_REMOVE_ITEMS;
+    if (g_str_equal(cmd_str, "focus_item"))         return WCP_CMD_FOCUS_ITEM;
+    if (g_str_equal(cmd_str, "clear"))              return WCP_CMD_CLEAR;
+    if (g_str_equal(cmd_str, "set_viewport_to"))    return WCP_CMD_SET_VIEWPORT_TO;
     if (g_str_equal(cmd_str, "set_viewport_range")) return WCP_CMD_SET_VIEWPORT_RANGE;
+    if (g_str_equal(cmd_str, "zoom_to_fit"))        return WCP_CMD_ZOOM_TO_FIT;
     if (g_str_equal(cmd_str, "load"))               return WCP_CMD_LOAD;
+    if (g_str_equal(cmd_str, "reload"))             return WCP_CMD_RELOAD;
     if (g_str_equal(cmd_str, "shutdown"))           return WCP_CMD_SHUTDOWN;
     
     return WCP_CMD_UNKNOWN;
@@ -87,6 +111,29 @@ static gboolean json_object_require_string(JsonObject *obj,
     return TRUE;
 }
 
+static gboolean json_object_require_boolean(JsonObject *obj,
+                                            const gchar *name,
+                                            gboolean *out,
+                                            GError **error)
+{
+    if (!json_object_has_member(obj, name)) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Missing required field: %s", name);
+        return FALSE;
+    }
+
+    JsonNode *node = json_object_get_member(obj, name);
+    if (!JSON_NODE_HOLDS_VALUE(node) ||
+        json_node_get_value_type(node) != G_TYPE_BOOLEAN) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Field '%s' must be a boolean", name);
+        return FALSE;
+    }
+
+    *out = json_node_get_boolean(node);
+    return TRUE;
+}
+
 static gboolean json_object_require_int64(JsonObject *obj,
                                           const gchar *name,
                                           gint64 *out,
@@ -120,6 +167,66 @@ static gboolean json_object_require_int64(JsonObject *obj,
     return FALSE;
 }
 
+static gboolean json_object_require_uint(JsonObject *obj,
+                                         const gchar *name,
+                                         guint *out,
+                                         GError **error)
+{
+    gint64 value = 0;
+    if (!json_object_require_int64(obj, name, &value, error)) {
+        return FALSE;
+    }
+    if (value < 0 || value > G_MAXUINT) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Field '%s' must be a non-negative integer", name);
+        return FALSE;
+    }
+    *out = (guint)value;
+    return TRUE;
+}
+
+static GArray* parse_id_array(JsonArray *arr, GError **error)
+{
+    GArray *ids = g_array_new(FALSE, FALSE, sizeof(WcpDisplayedItemRef));
+    guint len = json_array_get_length(arr);
+    
+    for (guint i = 0; i < len; i++) {
+        JsonNode *node = json_array_get_element(arr, i);
+        if (!JSON_NODE_HOLDS_VALUE(node)) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "ids[%u] must be a number", i);
+            g_array_free(ids, TRUE);
+            return NULL;
+        }
+
+        GType type = json_node_get_value_type(node);
+        gint64 value = 0;
+        if (type == G_TYPE_INT64) {
+            value = json_node_get_int(node);
+        } else if (type == G_TYPE_DOUBLE) {
+            value = (gint64)json_node_get_double(node);
+        } else {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "ids[%u] must be a number", i);
+            g_array_free(ids, TRUE);
+            return NULL;
+        }
+
+        if (value < 0) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "ids[%u] must be non-negative", i);
+            g_array_free(ids, TRUE);
+            return NULL;
+        }
+
+        WcpDisplayedItemRef ref;
+        ref.id = (guint64)value;
+        g_array_append_val(ids, ref);
+    }
+    
+    return ids;
+}
+
 static GPtrArray* parse_string_array(JsonArray *arr, GError **error, const gchar *label)
 {
     GPtrArray *strings = g_ptr_array_new_with_free_func(g_free);
@@ -138,6 +245,46 @@ static GPtrArray* parse_string_array(JsonArray *arr, GError **error, const gchar
     }
     
     return strings;
+}
+
+static GArray* parse_marker_array(JsonArray *arr, GError **error)
+{
+    GArray *markers = g_array_new(FALSE, TRUE, sizeof(WcpMarkerInfo));
+    guint len = json_array_get_length(arr);
+    
+    for (guint i = 0; i < len; i++) {
+        JsonNode *node = json_array_get_element(arr, i);
+        if (!JSON_NODE_HOLDS_OBJECT(node)) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                        "markers[%u] must be an object", i);
+            g_array_free(markers, TRUE);
+            return NULL;
+        }
+        JsonObject *marker_obj = json_node_get_object(node);
+        WcpMarkerInfo marker = {0};
+        
+        if (!json_object_require_int64(marker_obj, "time", &marker.time, error) ||
+            !json_object_require_boolean(marker_obj, "move_focus", &marker.move_focus, error)) {
+            g_array_free(markers, TRUE);
+            return NULL;
+        }
+        
+        if (json_object_has_member(marker_obj, "name")) {
+            JsonNode *name_node = json_object_get_member(marker_obj, "name");
+            if (!JSON_NODE_HOLDS_VALUE(name_node) ||
+                json_node_get_value_type(name_node) != G_TYPE_STRING) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Field 'name' must be a string");
+                g_array_free(markers, TRUE);
+                return NULL;
+            }
+            marker.name = g_strdup(json_node_get_string(name_node));
+        }
+        
+        g_array_append_val(markers, marker);
+    }
+    
+    return markers;
 }
 
 WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
@@ -193,6 +340,83 @@ WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
     
     /* Parse command-specific fields */
     switch (cmd_type) {
+        case WCP_CMD_GET_ITEM_INFO:
+        case WCP_CMD_REMOVE_ITEMS:
+        {
+            JsonArray *arr = NULL;
+            if (!json_object_require_array(obj, "ids", &arr, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.item_refs.ids = parse_id_array(arr, error);
+            if (!cmd->data.item_refs.ids) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            break;
+        }
+        case WCP_CMD_SET_ITEM_COLOR:
+        {
+            gint64 id_value = 0;
+            if (!json_object_require_int64(obj, "id", &id_value, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            if (id_value < 0) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Field 'id' must be non-negative");
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.set_color.id.id = (guint64)id_value;
+            if (!json_object_require_string(obj, "color", &cmd->data.set_color.color, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            break;
+        }
+        case WCP_CMD_ADD_VARIABLES:
+        {
+            JsonArray *arr = NULL;
+            if (!json_object_require_array(obj, "variables", &arr, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.add_vars.variables = parse_string_array(arr, error, "variables");
+            if (!cmd->data.add_vars.variables) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            break;
+        }
+        case WCP_CMD_ADD_SCOPE:
+        {
+            if (!json_object_require_string(obj, "scope", &cmd->data.add_scope.scope, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            if (json_object_has_member(obj, "recursive")) {
+                JsonNode *node = json_object_get_member(obj, "recursive");
+                if (!JSON_NODE_HOLDS_VALUE(node) ||
+                    json_node_get_value_type(node) != G_TYPE_BOOLEAN) {
+                    g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                                "Field 'recursive' must be a boolean");
+                    g_object_unref(parser);
+                    wcp_command_free(cmd);
+                    return NULL;
+                }
+                cmd->data.add_scope.recursive = json_node_get_boolean(node);
+            }
+            break;
+        }
         case WCP_CMD_ADD_ITEMS:
         {
             JsonArray *arr = NULL;
@@ -221,6 +445,31 @@ WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
             }
             break;
         }
+        case WCP_CMD_ADD_MARKERS:
+        {
+            JsonArray *arr = NULL;
+            if (!json_object_require_array(obj, "markers", &arr, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.add_markers.markers = parse_marker_array(arr, error);
+            if (!cmd->data.add_markers.markers) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            break;
+        }
+        case WCP_CMD_SET_VIEWPORT_TO:
+            if (!json_object_require_int64(obj, "timestamp",
+                                           &cmd->data.viewport_to.timestamp, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            break;
+
         case WCP_CMD_SET_VIEWPORT_RANGE:
             if (!json_object_require_int64(obj, "start", &cmd->data.viewport_range.start, error) ||
                 !json_object_require_int64(obj, "end", &cmd->data.viewport_range.end, error)) {
@@ -230,8 +479,42 @@ WcpCommand* wcp_parse_command(const gchar *json_str, GError **error)
             }
             break;
 
+        case WCP_CMD_FOCUS_ITEM:
+        {
+            gint64 id_value = 0;
+            if (!json_object_require_int64(obj, "id", &id_value, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            if (id_value < 0) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Field 'id' must be non-negative");
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            cmd->data.focus.id.id = (guint64)id_value;
+            break;
+        }
         case WCP_CMD_LOAD:
             if (!json_object_require_string(obj, "source", &cmd->data.load.source, error)) {
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            break;
+
+        case WCP_CMD_ZOOM_TO_FIT:
+            if (!json_object_has_member(obj, "viewport_idx")) {
+                g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "Missing required field: viewport_idx");
+                g_object_unref(parser);
+                wcp_command_free(cmd);
+                return NULL;
+            }
+            if (!json_object_require_uint(obj, "viewport_idx",
+                                          &cmd->data.zoom.viewport_idx, error)) {
                 g_object_unref(parser);
                 wcp_command_free(cmd);
                 return NULL;
@@ -252,9 +535,41 @@ void wcp_command_free(WcpCommand *cmd)
     if (!cmd) return;
     
     switch (cmd->type) {
+        case WCP_CMD_GET_ITEM_INFO:
+        case WCP_CMD_REMOVE_ITEMS:
+            if (cmd->data.item_refs.ids) {
+                g_array_free(cmd->data.item_refs.ids, TRUE);
+            }
+            break;
+            
+        case WCP_CMD_SET_ITEM_COLOR:
+            g_free(cmd->data.set_color.color);
+            break;
+            
+        case WCP_CMD_ADD_VARIABLES:
+            if (cmd->data.add_vars.variables) {
+                g_ptr_array_free(cmd->data.add_vars.variables, TRUE);
+            }
+            break;
+            
+        case WCP_CMD_ADD_SCOPE:
+            g_free(cmd->data.add_scope.scope);
+            break;
+            
         case WCP_CMD_ADD_ITEMS:
             if (cmd->data.add_items.items) {
                 g_ptr_array_free(cmd->data.add_items.items, TRUE);
+            }
+            break;
+            
+        case WCP_CMD_ADD_MARKERS:
+            if (cmd->data.add_markers.markers) {
+                for (guint i = 0; i < cmd->data.add_markers.markers->len; i++) {
+                    WcpMarkerInfo *m = &g_array_index(cmd->data.add_markers.markers, 
+                                                       WcpMarkerInfo, i);
+                    g_free(m->name);
+                }
+                g_array_free(cmd->data.add_markers.markers, TRUE);
             }
             break;
             
@@ -298,7 +613,8 @@ gchar* wcp_create_ack(void)
 }
 
 gchar* wcp_create_error(const gchar *error_type, 
-                        const gchar *message)
+                        const gchar *message,
+                        GPtrArray *arguments)
 {
     JsonBuilder *builder = json_builder_new();
     
@@ -311,6 +627,123 @@ gchar* wcp_create_error(const gchar *error_type,
     
     json_builder_set_member_name(builder, "message");
     json_builder_add_string_value(builder, message);
+    
+    json_builder_set_member_name(builder, "arguments");
+    json_builder_begin_array(builder);
+    if (arguments) {
+        for (guint i = 0; i < arguments->len; i++) {
+            json_builder_add_string_value(builder, g_ptr_array_index(arguments, i));
+        }
+    }
+    json_builder_end_array(builder);
+    
+    json_builder_end_object(builder);
+    
+    return wcp_json_builder_to_string(builder);
+}
+
+gchar* wcp_create_item_list_response(GArray *ids)
+{
+    JsonBuilder *builder = json_builder_new();
+    
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "type");
+    json_builder_add_string_value(builder, "response");
+    
+    json_builder_set_member_name(builder, "command");
+    json_builder_add_string_value(builder, "get_item_list");
+    
+    json_builder_set_member_name(builder, "ids");
+    json_builder_begin_array(builder);
+    if (ids) {
+        for (guint i = 0; i < ids->len; i++) {
+            WcpDisplayedItemRef *ref = &g_array_index(ids, WcpDisplayedItemRef, i);
+            json_builder_add_int_value(builder, (gint64)ref->id);
+        }
+    }
+    json_builder_end_array(builder);
+    
+    json_builder_end_object(builder);
+    
+    return wcp_json_builder_to_string(builder);
+}
+
+gchar* wcp_create_item_info_response(GPtrArray *items)
+{
+    JsonBuilder *builder = json_builder_new();
+    
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "type");
+    json_builder_add_string_value(builder, "response");
+    
+    json_builder_set_member_name(builder, "command");
+    json_builder_add_string_value(builder, "get_item_info");
+    
+    json_builder_set_member_name(builder, "results");
+    json_builder_begin_array(builder);
+    if (items) {
+        for (guint i = 0; i < items->len; i++) {
+            WcpItemInfo *info = g_ptr_array_index(items, i);
+            json_builder_begin_object(builder);
+            
+            json_builder_set_member_name(builder, "name");
+            json_builder_add_string_value(builder, info->name);
+            
+            json_builder_set_member_name(builder, "type");
+            json_builder_add_string_value(builder, info->type);
+            
+            json_builder_set_member_name(builder, "id");
+            json_builder_add_int_value(builder, (gint64)info->id.id);
+            
+            json_builder_end_object(builder);
+        }
+    }
+    json_builder_end_array(builder);
+    
+    json_builder_end_object(builder);
+    
+    return wcp_json_builder_to_string(builder);
+}
+
+gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
+{
+    JsonBuilder *builder = json_builder_new();
+    
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "type");
+    json_builder_add_string_value(builder, "response");
+    
+    json_builder_set_member_name(builder, "command");
+    json_builder_add_string_value(builder, command ? command : "add_items");
+    
+    json_builder_set_member_name(builder, "ids");
+    json_builder_begin_array(builder);
+    if (ids) {
+        for (guint i = 0; i < ids->len; i++) {
+            WcpDisplayedItemRef *ref = &g_array_index(ids, WcpDisplayedItemRef, i);
+            json_builder_add_int_value(builder, (gint64)ref->id);
+        }
+    }
+    json_builder_end_array(builder);
+    
+    json_builder_end_object(builder);
+    
+    return wcp_json_builder_to_string(builder);
+}
+
+gchar* wcp_create_waveforms_loaded_event(const gchar *source)
+{
+    JsonBuilder *builder = json_builder_new();
+    
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "type");
+    json_builder_add_string_value(builder, "event");
+    
+    json_builder_set_member_name(builder, "event");
+    json_builder_add_string_value(builder, "waveforms_loaded");
+    
+    json_builder_set_member_name(builder, "source");
+    json_builder_add_string_value(builder, source);
     
     json_builder_end_object(builder);
     
