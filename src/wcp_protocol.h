@@ -41,11 +41,6 @@ typedef enum {
  * Data Structures
  * ============================================================================ */
 
-/* Reference to a displayed item */
-typedef struct {
-    guint64 id;
-} WcpDisplayedItemRef;
-
 /* Parsed WCP command */
 typedef struct {
     WcpCommandType type;
@@ -87,6 +82,6 @@ gchar* wcp_create_ack(void);
 gchar* wcp_create_error(const gchar *error_type, 
                         const gchar *message,
                         GPtrArray *arguments);
-gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids);
+gchar* wcp_create_add_items_response_for(const gchar *command);
 
 #endif /* WCP_PROTOCOL_H */

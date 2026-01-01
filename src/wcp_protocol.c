@@ -327,7 +327,7 @@ gchar* wcp_create_error(const gchar *error_type,
     return wcp_json_builder_to_string(builder);
 }
 
-gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
+gchar* wcp_create_add_items_response_for(const gchar *command)
 {
     JsonBuilder *builder = json_builder_new();
     
@@ -340,12 +340,6 @@ gchar* wcp_create_add_items_response_for(const gchar *command, GArray *ids)
     
     json_builder_set_member_name(builder, "ids");
     json_builder_begin_array(builder);
-    if (ids) {
-        for (guint i = 0; i < ids->len; i++) {
-            WcpDisplayedItemRef *ref = &g_array_index(ids, WcpDisplayedItemRef, i);
-            json_builder_add_int_value(builder, (gint64)ref->id);
-        }
-    }
     json_builder_end_array(builder);
     
     json_builder_end_object(builder);
