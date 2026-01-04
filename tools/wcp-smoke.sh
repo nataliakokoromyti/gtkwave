@@ -107,4 +107,9 @@ fi
 
 printf '%s\n' '{"type":"command","command":"shutdown"}' | nc -N localhost "$PORT" >"$tmpdir/out5"
 
+if ! grep -q '"command":"ack"' "$tmpdir/out5"; then
+    echo "error: shutdown ack missing" >&2
+    exit 1
+fi
+
 echo "WCP smoke test: OK"
