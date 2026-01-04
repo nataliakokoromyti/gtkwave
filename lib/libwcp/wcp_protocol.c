@@ -749,4 +749,3 @@ gchar* wcp_create_waveforms_loaded_event(const gchar *source)
     
     return wcp_json_builder_to_string(builder);
 }
-

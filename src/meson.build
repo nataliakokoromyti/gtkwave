@@ -72,12 +72,8 @@ gtkwave_sources = [
     'cocoa/cocoa_misc.c',
 ]
 
-json_glib_dep = dependency('json-glib-1.0', required: wcp_enabled)
-
 if wcp_enabled
     gtkwave_sources += files(
-        'wcp_protocol.c',
-        'wcp_server.c',
         'wcp_gtkwave.c',
     )
 endif
@@ -97,13 +93,17 @@ gtkwave_dependencies = [
 ]
 
 if wcp_enabled
-    gtkwave_dependencies += json_glib_dep
+    gtkwave_dependencies += libwcp_dep
 endif
 
 gtkwave_include_directories = [
     config_inc,
     'cocoa',
 ]
+
+if wcp_enabled
+    gtkwave_include_directories += include_directories('../lib/libwcp')
+endif
 
 executable(
     'gtkwave',
