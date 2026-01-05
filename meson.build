@@ -25,7 +25,6 @@ wcp_enabled = get_option('wcp')
 if wcp_enabled
     add_project_arguments(
         '-DHAVE_WCP',
-        '-DWCP_DEFAULT_PORT=@0@'.format(get_option('wcp_default_port')),
         language: 'c',
     )
 endif

@@ -13,6 +13,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifndef WCP_DEFAULT_PORT
+#define WCP_DEFAULT_PORT 8765
+#endif
+
 #include "wcp_server.h"
 
 /* ============================================================================

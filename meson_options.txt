@@ -81,10 +81,3 @@ option(
     value: false,
     description: 'Enable WCP (Waveform Control Protocol) support',
 )
-
-option(
-    'wcp_default_port',
-    type: 'integer',
-    value: 8765,
-    description: 'Default port for WCP server',
-)
