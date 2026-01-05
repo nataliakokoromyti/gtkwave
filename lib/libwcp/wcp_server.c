@@ -106,7 +106,7 @@ static void start_reading(WcpServer *server)
                                         server);
 }
 
-static bool on_incoming_connection(GSocketService *service,
+static gboolean on_incoming_connection(GSocketService *service,
                                        GSocketConnection *connection,
                                        GObject *source_object,
                                        gpointer user_data)
@@ -156,7 +156,7 @@ WcpServer* wcp_server_new(uint16_t port,
     return server;
 }
 
-bool wcp_server_start(WcpServer *server, GError **error)
+gboolean wcp_server_start(WcpServer *server, GError **error)
 {
     if (server->running) {
         g_set_error(error, G_IO_ERROR, G_IO_ERROR_ALREADY_MOUNTED,
@@ -226,7 +226,7 @@ void wcp_server_free(WcpServer *server)
     g_free(server);
 }
 
-bool wcp_server_send(WcpServer *server, char *message)
+gboolean wcp_server_send(WcpServer *server, char *message)
 {
     if (!server->client_connected || !server->output_stream) {
         g_free(message);
@@ -240,7 +240,7 @@ bool wcp_server_send(WcpServer *server, char *message)
     GError *error = NULL;
     gsize bytes_written;
     
-    bool success = g_output_stream_write_all(server->output_stream,
+    gboolean success = g_output_stream_write_all(server->output_stream,
                                                   msg_with_newline,
                                                   strlen(msg_with_newline),
                                                   &bytes_written,
@@ -264,7 +264,7 @@ void wcp_server_emit_waveforms_loaded(WcpServer *server, const char *source)
     wcp_server_send(server, event);
 }
 
-bool wcp_server_initiate(WcpServer *server,
+gboolean wcp_server_initiate(WcpServer *server,
                              const char *host,
                              uint16_t port,
                              GError **error)
