@@ -2413,6 +2413,7 @@ gboolean deal_with_rpc_open_2(const gchar *path, gpointer user_data, gboolean is
                               ".evcd",
                               ".dump",
                               ".fst",
+                              ".fsdb",
                               ".ghw",
 #ifdef EXTLOAD_SUFFIX
                               EXTLOAD_SUFFIX,

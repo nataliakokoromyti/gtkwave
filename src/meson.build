@@ -22,6 +22,7 @@ gtkwave_sources = [
     'dump_file_main.c',
     'fetchbuttons.c',
     'fgetdynamic.c',
+    'fsdb_plugin.c',
     'file.c',
     'fonts.c',
     'gconf.c',
@@ -72,6 +73,7 @@ gtkwave_sources = [
 
 gtkwave_dependencies = [
     glib_dep,
+    gmodule_dep,
     gtk_dep,
     gtk_mac_integration_dep,
     gtk_unix_print_dep,

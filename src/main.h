@@ -59,6 +59,7 @@ enum FileType
 #ifdef EXTLOAD_SUFFIX
     EXTLOAD_FILE,
 #endif
+    FSDB_FILE,
     FST_FILE,
     DUMPLESS_FILE
 };
