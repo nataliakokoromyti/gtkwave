@@ -63,6 +63,14 @@ Specify end time for LXT2/VZT block skip.
 Specify stems file for source code annotation.  This will automatically launch the \fIrtlbrowse\fP(1) helper process.
 See \fIxml2stems\fP(1) for information on stems file generation.
 .TP
+\fB\-\-fsdb-plugin\fR <\fIfilename\fP>
+Specify a shared library that converts FSDB to FST at runtime.  This allows FSDB
+support without linking the proprietary FSDB SDK into GTKWave.
+.TP
+\fB\-\-fsdb-plugin-build\fR <\fIdirectory\fP>
+Build the FSDB plugin into the specified directory using the FSDB SDK and set
+the plugin path for this run.
+.TP
 \fB\-c\fR,\fB\-\-cpu\fR <\fInumcpus\fP>
 Specify number of CPUs available for parallelizable ops (e.g., block prefetching on VZT reads).
 .TP

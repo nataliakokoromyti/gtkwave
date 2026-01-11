@@ -22,6 +22,7 @@ gtkwave_sources = [
     'dump_file_main.c',
     'fetchbuttons.c',
     'fgetdynamic.c',
+    'fsdb_plugin.c',
     'file.c',
     'fonts.c',
     'gconf.c',
@@ -82,6 +83,7 @@ gtkwave_dependencies = [
     judy_dep,
     gnu_regex_dep,
     libgtkwave_dep,
+    gmodule_dep,
 ]
 
 gtkwave_include_directories = [

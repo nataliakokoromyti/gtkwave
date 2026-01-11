@@ -16,6 +16,7 @@
 #include "currenttime.h"
 #include "debug.h"
 #include "fgetdynamic.h"
+#include "fsdb_plugin.h"
 #include <getopt.h>
 #include "gtk23compat.h"
 #include "main.h"
@@ -202,6 +203,9 @@ static const struct Global globals_base_values = {
     NULL, /* notebook */
     NULL, /* loaded_file_name */
     NULL, /* unoptimized_vcd_file_name  */
+    NULL, /* fsdb_source_name */
+    NULL, /* fsdb_temp_fst_name */
+    NULL, /* fsdb_plugin_path */
     NULL, /* skip_start */
     NULL, /* skip_end */
     MISSING_FILE, /* loaded_file_type */
@@ -1222,6 +1226,16 @@ void reload_into_new_context_2(void)
                                  &GLOBALS->unoptimized_vcd_file_name);
     }
 
+    strcpy2_into_new_context(new_globals,
+                             &new_globals->fsdb_source_name,
+                             &GLOBALS->fsdb_source_name);
+    strcpy2_into_new_context(new_globals,
+                             &new_globals->fsdb_temp_fst_name,
+                             &GLOBALS->fsdb_temp_fst_name);
+    strcpy2_into_new_context(new_globals,
+                             &new_globals->fsdb_plugin_path,
+                             &GLOBALS->fsdb_plugin_path);
+
     g_clear_object(&GLOBALS->dump_file);
 
     /* window destruction (of windows that aren't the parent window) */
@@ -1365,6 +1379,44 @@ void reload_into_new_context_2(void)
                     fst_main(GLOBALS->loaded_file_name, GLOBALS->skip_start, GLOBALS->skip_end);
                 load_was_success = GLOBALS->dump_file != NULL;
                 break;
+
+            case FSDB_FILE: {
+                const char *source =
+                    GLOBALS->fsdb_source_name ? GLOBALS->fsdb_source_name : GLOBALS->loaded_file_name;
+                char *fsdb_error = NULL;
+                char *fst_path = fsdb_plugin_convert_to_fst(source,
+                                                            GLOBALS->fsdb_plugin_path,
+                                                            &fsdb_error);
+                if (!fst_path) {
+                    if (fsdb_error) {
+                        g_free(fsdb_error);
+                    }
+                    load_was_success = 0;
+                    break;
+                }
+
+                if (GLOBALS->fsdb_temp_fst_name) {
+                    fsdb_plugin_cleanup_temp_file(GLOBALS->fsdb_temp_fst_name);
+                    free_2(GLOBALS->fsdb_temp_fst_name);
+                    GLOBALS->fsdb_temp_fst_name = NULL;
+                }
+
+                GLOBALS->fsdb_temp_fst_name = fst_path;
+
+                if (!GLOBALS->fsdb_source_name) {
+                    GLOBALS->fsdb_source_name = strdup_2(source);
+                }
+
+                if (GLOBALS->loaded_file_name) {
+                    free_2(GLOBALS->loaded_file_name);
+                }
+                GLOBALS->loaded_file_name = strdup_2(fst_path);
+
+                GLOBALS->dump_file =
+                    fst_main(GLOBALS->loaded_file_name, GLOBALS->skip_start, GLOBALS->skip_end);
+                load_was_success = GLOBALS->dump_file != NULL;
+                break;
+            }
 
             case GHW_FILE:
                 GLOBALS->dump_file = ghw_main(GLOBALS->loaded_file_name);

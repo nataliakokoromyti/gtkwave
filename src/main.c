@@ -19,6 +19,7 @@
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #ifdef __MINGW32__
 #include <windows.h>
@@ -69,6 +70,7 @@
 #include "gw-time-display.h"
 #include "gw-vcd-file.h"
 #include "gw-fst-file.h"
+#include "fsdb_plugin.h"
 
 #include "tcl_helper.h"
 
@@ -202,6 +204,94 @@ static void close_all_fst_files(void) /* so mingw does delete of reader tempfile
 }
 #endif
 
+static void fsdb_build_set_error(char **error_message, const char *format, ...)
+{
+    va_list args;
+
+    if (!error_message) {
+        return;
+    }
+
+    g_free(*error_message);
+    *error_message = NULL;
+
+    va_start(args, format);
+    *error_message = g_strdup_vprintf(format, args);
+    va_end(args);
+}
+
+static int build_fsdb_plugin(const char *out_dir, char **plugin_path, char **error_message)
+{
+    char *script_path = NULL;
+    char *stdout_buf = NULL;
+    char *stderr_buf = NULL;
+    GError *spawn_error = NULL;
+    gint exit_status = 0;
+    char *argv[] = {NULL, NULL, NULL};
+    int ok = 0;
+
+    if (!out_dir || !*out_dir) {
+        fsdb_build_set_error(error_message, "Missing fsdb plugin build directory");
+        return 0;
+    }
+
+    if (!plugin_path) {
+        fsdb_build_set_error(error_message, "Missing plugin output path");
+        return 0;
+    }
+
+    script_path = g_build_filename("contrib", "fsdb-plugin", "build-fsdb-plugin.sh", NULL);
+    if (!g_file_test(script_path, G_FILE_TEST_EXISTS)) {
+        fsdb_build_set_error(error_message,
+                             "FSDB plugin build script not found: %s",
+                             script_path);
+        g_free(script_path);
+        return 0;
+    }
+
+    argv[0] = script_path;
+    argv[1] = (char *)out_dir;
+
+    if (!g_spawn_sync(NULL,
+                      argv,
+                      NULL,
+                      G_SPAWN_SEARCH_PATH,
+                      NULL,
+                      NULL,
+                      &stdout_buf,
+                      &stderr_buf,
+                      &exit_status,
+                      &spawn_error)) {
+        fsdb_build_set_error(error_message, "%s", spawn_error->message);
+        g_error_free(spawn_error);
+        goto cleanup;
+    }
+
+    if (!g_spawn_check_exit_status(exit_status, &spawn_error)) {
+        if (stderr_buf && *stderr_buf) {
+            fsdb_build_set_error(error_message, "%s", stderr_buf);
+        } else {
+            fsdb_build_set_error(error_message, "%s", spawn_error->message);
+        }
+        g_error_free(spawn_error);
+        goto cleanup;
+    }
+
+    if (stderr_buf && *stderr_buf) {
+        fsdb_build_set_error(error_message, "%s", stderr_buf);
+        goto cleanup;
+    }
+
+    *plugin_path = g_build_filename(out_dir, "libgtkwave_fsdb_plugin.so", NULL);
+    ok = 1;
+
+cleanup:
+    g_free(stdout_buf);
+    g_free(stderr_buf);
+    g_free(script_path);
+    return ok;
+}
+
 void wave_gtk_window_set_title(GtkWindow *window, const gchar *title, int typ, int pct)
 {
     if (window && title) {
@@ -247,6 +337,8 @@ static void print_help(char *nam)
 
 #define STEMS_GETOPT "  -t, --stems=FILE           specify stems file for source code annotation\n"
 #define DUAL_GETOPT "  -D, --dualid=WHICH         specify multisession identifier\n"
+#define FSDB_PLUGIN_GETOPT "      --fsdb-plugin=FILE     load FSDB plugin (shared library)\n" \
+                           "      --fsdb-plugin-build=DIR build FSDB plugin from SDK into DIR\n"
 
 #ifdef WAVE_USE_XID
 #define XID_GETOPT "  -X, --xid=XID              specify XID of window for GtkPlug to connect to\n"
@@ -284,7 +376,7 @@ static void print_help(char *nam)
         "  -l, --logfile=FILE         specify simulation logfile name for time values\n"
         "  -s, --start=TIME           specify start time for FST skip\n"
         "  -e, --end=TIME             specify end time for for FST "
-        "skip\n" STEMS_GETOPT WAVE_GETOPT_CPUS
+        "skip\n" STEMS_GETOPT WAVE_GETOPT_CPUS FSDB_PLUGIN_GETOPT
         "  -N, --nowm                 disable window manager for most windows\n"
         "  -M, --nomenus              do not render menubar (for making applets)\n"
         "  -S, --script=FILE          specify Tcl command script file for "
@@ -667,6 +759,7 @@ int main_2(int opt_vcd, int argc, char *argv[])
     static const char *winstd = "GTKWave (stdio) ";
     char *output_name = NULL;
     char *chdir_cache = NULL;
+    char *fsdb_plugin_build_dir = NULL;
 
     int magic_word_filetype = G_FT_UNKNOWN;
 
@@ -932,6 +1025,8 @@ do_primary_inits:
                                                    {"sstexclude", 1, 0, '5'},
                                                    {"dark", 0, 0, '6'},
                                                    {"saveonexit", 0, 0, '7'},
+                                                   {"fsdb-plugin", 1, 0, 0},
+                                                   {"fsdb-plugin-build", 1, 0, 0},
                                                    {0, 0, 0, 0}};
 
             c = getopt_long(argc,
@@ -951,6 +1046,20 @@ do_primary_inits:
                                              "warranty; not even for MERCHANTABILITY or FITNESS "
                                              "FOR A PARTICULAR PURPOSE.\n");
                     exit(0);
+
+                case 0:
+                    if (!strcmp(long_options[option_index].name, "fsdb-plugin")) {
+                        if (GLOBALS->fsdb_plugin_path) {
+                            free_2(GLOBALS->fsdb_plugin_path);
+                        }
+                        GLOBALS->fsdb_plugin_path = strdup_2(optarg);
+                    } else if (!strcmp(long_options[option_index].name, "fsdb-plugin-build")) {
+                        if (fsdb_plugin_build_dir) {
+                            free_2(fsdb_plugin_build_dir);
+                        }
+                        fsdb_plugin_build_dir = strdup_2(optarg);
+                    }
+                    break;
 
                 case 'D': {
                     char *s = optarg;
@@ -1233,6 +1342,35 @@ do_primary_inits:
         }
     }
 
+    if (fsdb_plugin_build_dir) {
+        char *built_path = NULL;
+        char *build_error = NULL;
+
+        if (!build_fsdb_plugin(fsdb_plugin_build_dir, &built_path, &build_error)) {
+            fprintf(stderr,
+                    "GTKWAVE | FSDB plugin build failed: %s\n",
+                    build_error ? build_error : "unknown error");
+            g_free(build_error);
+            free_2(fsdb_plugin_build_dir);
+            vcd_exit(255);
+        }
+
+        free_2(fsdb_plugin_build_dir);
+        fsdb_plugin_build_dir = NULL;
+
+        if (GLOBALS->fsdb_plugin_path) {
+            free_2(GLOBALS->fsdb_plugin_path);
+        }
+        GLOBALS->fsdb_plugin_path = built_path;
+    }
+
+    if (!GLOBALS->fsdb_plugin_path) {
+        const char *fsdb_env = getenv("GTKWAVE_FSDB_PLUGIN");
+        if (fsdb_env && *fsdb_env) {
+            GLOBALS->fsdb_plugin_path = strdup_2(fsdb_env);
+        }
+    }
+
 #ifdef WAVE_USE_XID
     if (GLOBALS->socket_xid) {
         gboolean is_x11_display = FALSE;
@@ -1415,6 +1553,46 @@ loader_check_head:
         GLOBALS->aet_name = malloc_2(strlen(GLOBALS->loaded_file_name) + 1);
         strcpy(GLOBALS->aet_name, GLOBALS->loaded_file_name);
         GLOBALS->loaded_file_type = FST_FILE;
+        GLOBALS->dump_file =
+            fst_main(GLOBALS->loaded_file_name, GLOBALS->skip_start, GLOBALS->skip_end);
+        if (GLOBALS->dump_file == NULL) {
+            fprintf(stderr,
+                    "GTKWAVE | Could not initialize '%s'%s.\n",
+                    GLOBALS->loaded_file_name,
+                    GLOBALS->vcd_jmp_buf ? "" : ", exiting");
+            vcd_exit(255);
+        }
+    } else if (suffix_check(GLOBALS->loaded_file_name, ".fsdb")) {
+        char *fsdb_error = NULL;
+        char *fst_path = fsdb_plugin_convert_to_fst(GLOBALS->loaded_file_name,
+                                                    GLOBALS->fsdb_plugin_path,
+                                                    &fsdb_error);
+        if (!fst_path) {
+            fprintf(stderr,
+                    "GTKWAVE | FSDB plugin error: %s\n",
+                    fsdb_error ? fsdb_error : "unknown error");
+            g_free(fsdb_error);
+            vcd_exit(255);
+        }
+
+        if (GLOBALS->fsdb_source_name) {
+            free_2(GLOBALS->fsdb_source_name);
+        }
+        GLOBALS->fsdb_source_name = strdup_2(GLOBALS->loaded_file_name);
+
+        if (GLOBALS->fsdb_temp_fst_name) {
+            fsdb_plugin_cleanup_temp_file(GLOBALS->fsdb_temp_fst_name);
+            free_2(GLOBALS->fsdb_temp_fst_name);
+        }
+        GLOBALS->fsdb_temp_fst_name = fst_path;
+
+        free_2(GLOBALS->loaded_file_name);
+        GLOBALS->loaded_file_name = strdup_2(fst_path);
+
+        GLOBALS->stems_type = WAVE_ANNO_FST;
+        GLOBALS->aet_name = malloc_2(strlen(GLOBALS->loaded_file_name) + 1);
+        strcpy(GLOBALS->aet_name, GLOBALS->loaded_file_name);
+        GLOBALS->loaded_file_type = FSDB_FILE;
         GLOBALS->dump_file =
             fst_main(GLOBALS->loaded_file_name, GLOBALS->skip_start, GLOBALS->skip_end);
         if (GLOBALS->dump_file == NULL) {

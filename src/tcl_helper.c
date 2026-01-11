@@ -2238,7 +2238,8 @@ static int determine_ftype(char *s, char **dotpnt)
                 (!strcasecmp(EXTLOAD_SUFFIX, dot + 1)) ||
 #endif
                 (!strcasecmp("vcd", dot + 1)) || (!strcasecmp("dmp", dot + 1)) ||
-                (!strcasecmp("fst", dot + 1)) || (!strcasecmp("ghw", dot + 1))) {
+                (!strcasecmp("fst", dot + 1)) || (!strcasecmp("fsdb", dot + 1)) ||
+                (!strcasecmp("ghw", dot + 1))) {
                 ftype = WAVE_FTYPE_DUMPFILE;
             } else if (dot2) {
                 if ((!strcasecmp("ghw.gz", dot2 + 1)) || (!strcasecmp("ghw.bz2", dot2 + 1)) ||

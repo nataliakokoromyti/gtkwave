@@ -1260,6 +1260,7 @@ GtkWidget *treeboxframe(const char *title)
 #ifdef EXTLOAD_SUFFIX
             case EXTLOAD_FILE:
 #endif
+            case FSDB_FILE:
             case FST_FILE:
                 /* fallthrough for Dir is deliberate for extload and FST */
                 if (has_nonimplicit_directions) {
