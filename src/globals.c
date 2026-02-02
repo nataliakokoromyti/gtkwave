@@ -37,6 +37,7 @@
 #include "signal_list.h"
 #include "dump_file_main.h"
 #include "gw-time-display.h"
+#include "fsdb_plugin.h"
 
 #ifdef __MINGW32__
 #define sleep(x) Sleep(x * 1000)
@@ -202,6 +203,8 @@ static const struct Global globals_base_values = {
     NULL, /* notebook */
     NULL, /* loaded_file_name */
     NULL, /* unoptimized_vcd_file_name  */
+    NULL, /* fsdb_plugin_path */
+    NULL, /* fsdb_temp_fst_name */
     NULL, /* skip_start */
     NULL, /* skip_end */
     MISSING_FILE, /* loaded_file_type */
@@ -1221,6 +1224,13 @@ void reload_into_new_context_2(void)
                                  &new_globals->unoptimized_vcd_file_name,
                                  &GLOBALS->unoptimized_vcd_file_name);
     }
+
+    strcpy2_into_new_context(new_globals,
+                             &new_globals->fsdb_plugin_path,
+                             &GLOBALS->fsdb_plugin_path);
+    strcpy2_into_new_context(new_globals,
+                             &new_globals->fsdb_temp_fst_name,
+                             &GLOBALS->fsdb_temp_fst_name);
 
     g_clear_object(&GLOBALS->dump_file);
 
