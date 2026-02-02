@@ -71,6 +71,7 @@
 #include "gw-time-display.h"
 #include "gw-vcd-file.h"
 #include "gw-fst-file.h"
+#include "fsdb_plugin.h"
 
 #include "tcl_helper.h"
 
@@ -203,6 +204,16 @@ static void close_all_fst_files(void) /* so mingw does delete of reader tempfile
     }
 }
 #endif
+
+static void cleanup_fsdb_temp_files(void)
+{
+    unsigned int i;
+    for (i = 0; i < GLOBALS->num_notebook_pages; i++) {
+        if ((*GLOBALS->contexts)[i]->fsdb_temp_fst_name) {
+            unlink((*GLOBALS->contexts)[i]->fsdb_temp_fst_name);
+        }
+    }
+}
 
 void wave_gtk_window_set_title(GtkWindow *window, const gchar *title, int typ, int pct)
 {
@@ -879,6 +890,14 @@ int main_2(int opt_vcd, int argc, char *argv[])
         fprintf(stderr, "GTKWAVE | GdkPixbuf loader for XPM images is not installed.\n");
     }
 
+    /* Check for FSDB plugin environment variable */
+    if (!GLOBALS->fsdb_plugin_path) {
+        const char *env_plugin = getenv("GTKWAVE_FSDB_PLUGIN");
+        if (env_plugin && *env_plugin) {
+            GLOBALS->fsdb_plugin_path = strdup_2(env_plugin);
+        }
+    }
+
 #if defined(__APPLE__)
 #ifndef MAC_INTEGRATION
 do_primary_inits:
@@ -899,6 +918,7 @@ do_primary_inits:
     if (!mainwindow_already_built) {
         atexit(remove_all_proc_filters);
         atexit(remove_all_ttrans_filters);
+        atexit(cleanup_fsdb_temp_files);
 #if defined __MINGW32__
         atexit(close_all_fst_files);
 #endif
@@ -943,6 +963,7 @@ do_primary_inits:
                                                    {"wcp", 0, 0, 0},
                                                    {"wcp-port", 1, 0, 0},
                                                    {"wcp-remote", 0, 0, 0},
+                                                   {"fsdb-plugin", 1, 0, 0},
                                                    {0, 0, 0, 0}};
 
             c = getopt_long(argc,
@@ -995,6 +1016,11 @@ do_primary_inits:
                         wcp_port = atoi(optarg);
                     } else if (!strcmp(long_options[option_index].name, "wcp-remote")) {
                         wcp_allow_remote = 1;
+                    } else if (!strcmp(long_options[option_index].name, "fsdb-plugin")) {
+                        if (GLOBALS->fsdb_plugin_path) {
+                            free_2(GLOBALS->fsdb_plugin_path);
+                        }
+                        GLOBALS->fsdb_plugin_path = strdup_2(optarg);
                     }
                     break;
 
@@ -1440,6 +1466,58 @@ loader_check_head:
             stderr,
             "GTKWAVE | LXT and LXT2 files are no longer supported by this version of GTKWave.\n");
         vcd_exit(255);
+    } else if (suffix_check(GLOBALS->loaded_file_name, ".fsdb")) {
+        /* Convert FSDB to FST via plugin */
+        if (!GLOBALS->fsdb_plugin_path) {
+            fprintf(stderr,
+                    "GTKWAVE | FSDB file detected but no plugin specified.\n"
+                    "GTKWAVE | Use --fsdb-plugin=PATH or set GTKWAVE_FSDB_PLUGIN environment variable.\n");
+            vcd_exit(255);
+        }
+
+        char *fsdb_error = NULL;
+        char *fst_path = fsdb_plugin_convert_to_fst(GLOBALS->loaded_file_name,
+                                                    GLOBALS->fsdb_plugin_path,
+                                                    &fsdb_error);
+        if (!fst_path) {
+            fprintf(stderr,
+                    "GTKWAVE | FSDB plugin conversion failed: %s\n",
+                    fsdb_error ? fsdb_error : "unknown error");
+            if (fsdb_error) {
+                g_free(fsdb_error);
+            }
+            vcd_exit(255);
+        }
+
+        /* Store temp file path for cleanup on exit */
+        /* Clean up previous temp file if opening another FSDB in same context */
+        if (GLOBALS->fsdb_temp_fst_name) {
+            unlink(GLOBALS->fsdb_temp_fst_name);
+            free_2(GLOBALS->fsdb_temp_fst_name);
+        }
+        GLOBALS->fsdb_temp_fst_name = strdup_2(fst_path);
+
+        /* Update loaded_file_name to point to FST */
+        free_2(GLOBALS->loaded_file_name);
+        GLOBALS->loaded_file_name = strdup_2(fst_path);
+
+        /* Free the GLib-allocated path string */
+        g_free(fst_path);
+
+        /* Now load the converted FST file */
+        GLOBALS->stems_type = WAVE_ANNO_FST;
+        GLOBALS->aet_name = malloc_2(strlen(GLOBALS->loaded_file_name) + 1);
+        strcpy(GLOBALS->aet_name, GLOBALS->loaded_file_name);
+        GLOBALS->loaded_file_type = FST_FILE;
+        GLOBALS->dump_file =
+            fst_main(GLOBALS->loaded_file_name, GLOBALS->skip_start, GLOBALS->skip_end);
+        if (GLOBALS->dump_file == NULL) {
+            fprintf(stderr,
+                    "GTKWAVE | Could not initialize converted FST '%s'%s.\n",
+                    GLOBALS->loaded_file_name,
+                    GLOBALS->vcd_jmp_buf ? "" : ", exiting");
+            vcd_exit(255);
+        }
     } else if ((magic_word_filetype == G_FT_FST) ||
                suffix_check(GLOBALS->loaded_file_name, ".fst")) {
         GLOBALS->stems_type = WAVE_ANNO_FST;

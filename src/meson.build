@@ -22,6 +22,7 @@ gtkwave_sources = [
     'dump_file_main.c',
     'fetchbuttons.c',
     'fgetdynamic.c',
+    'fsdb_plugin.c',
     'file.c',
     'fonts.c',
     'gconf.c',

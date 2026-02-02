@@ -231,6 +231,8 @@ struct Global
     GtkWidget *notebook;
     char *loaded_file_name;
     char *unoptimized_vcd_file_name;
+    char *fsdb_plugin_path;
+    char *fsdb_temp_fst_name;
     char *skip_start;
     char *skip_end;
     enum FileType loaded_file_type;
