@@ -6,7 +6,7 @@
 #include <string.h>
 
 #ifdef _WIN32
-#include <process.h>
+#include <io.h>
 #define unlink _unlink
 #else
 #include <unistd.h>
@@ -76,9 +76,13 @@ static char *fsdb_make_temp(char **error_message)
 
     fd = g_file_open_tmp("gtkwave-fsdb-XXXXXX.vcd", &filename, &error);
     if (fd < 0) {
-        if (error_message && error) {
-            *error_message = g_strdup_printf("Failed to create temp file: %s",
-                                             error->message);
+        if (error_message) {
+            if (error) {
+                *error_message = g_strdup_printf("Failed to create temp file: %s",
+                                                 error->message);
+            } else {
+                *error_message = g_strdup("Failed to create temp file: unknown error");
+            }
         }
         if (error) {
             g_error_free(error);
