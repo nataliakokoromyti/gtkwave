@@ -1,6 +1,5 @@
 #include "../../src/fsdb_plugin_api.h"
 
-#include <errno.h>
 #include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>
