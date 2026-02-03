@@ -1,9 +1,7 @@
 #include "../../src/fsdb_plugin_api.h"
 
 #include <glib.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #ifdef _WIN32
 #include <io.h>

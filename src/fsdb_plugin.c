@@ -3,7 +3,6 @@
 #include <glib.h>
 #include <gmodule.h>
 #include <stdarg.h>
-#include <stdlib.h>
 
 #ifdef __MINGW32__
 #include <io.h>
