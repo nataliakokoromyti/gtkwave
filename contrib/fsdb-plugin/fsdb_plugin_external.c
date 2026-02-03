@@ -75,7 +75,7 @@ static char *fsdb_make_temp(char **error_message)
     char *filename = NULL;
     gint fd = -1;
 
-    fd = g_file_open_tmp("gtkwave-fsdb-XXXXXX", &filename, &error);
+    fd = g_file_open_tmp("gtkwave-fsdb-XXXXXX.vcd", &filename, &error);
     if (fd < 0) {
         if (error_message && error) {
             *error_message = g_strdup_printf("Failed to create temp file: %s",
