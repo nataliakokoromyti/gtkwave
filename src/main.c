@@ -211,6 +211,8 @@ static void cleanup_fsdb_temp_files(void)
     for (i = 0; i < GLOBALS->num_notebook_pages; i++) {
         if ((*GLOBALS->contexts)[i]->fsdb_temp_fst_name) {
             unlink((*GLOBALS->contexts)[i]->fsdb_temp_fst_name);
+            free_2((*GLOBALS->contexts)[i]->fsdb_temp_fst_name);
+            (*GLOBALS->contexts)[i]->fsdb_temp_fst_name = NULL;
         }
     }
 }
